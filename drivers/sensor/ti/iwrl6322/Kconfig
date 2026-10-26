@@ -1,0 +1,389 @@
+# Copyright (c) 2026 Texas Instruments Incorporated
+# SPDX-License-Identifier: Apache-2.0
+
+config IWRL6322
+	bool "TI IWRL6322 mmWave Radar Sensor"
+	select SPI
+	select GPIO
+	select CRC
+	depends on DT_HAS_TI_IWRL6322_ENABLED
+	select SENSOR_ASYNC_API
+	help
+	  Enable the TI IWRL6322 60-64 GHz mmWave radar sensor driver.
+
+# ============================================================================
+# Work queue / timing
+# ============================================================================
+
+config IWRL6322_WORK_QUEUE_STACK_SIZE
+	int "Sensor work queue stack size"
+	default 4096
+	help
+	  Stack size for the dedicated mmWave sensor work queue.
+
+config IWRL6322_WORK_QUEUE_PRIORITY
+	int "Sensor work queue thread priority"
+	default 5
+	help
+	  Thread priority for the dedicated mmWave sensor work queue.
+
+config IWRL6322_DEBUG_LOG
+	bool "TI library debug logging"
+	default n
+	help
+	  When enabled, TI library printf callbacks emit debug-level log messages.
+
+# ============================================================================
+# RTIO buffer sizing
+# ============================================================================
+
+config IWRL6322_MAX_PAYLOAD_BYTES
+	int "Maximum sensor data payload (bytes)"
+	range 64 32768
+	default 4096
+	help
+	  Size of the RTIO payload buffer allocated for each sensor data fetch.
+	  Must be large enough for the largest expected sensor data packet.
+
+# ============================================================================
+# API timeout
+# ============================================================================
+
+config IWRL6322_API_TIMEOUT_MS
+	int "TI library API response timeout (ms)"
+	range 1 255
+	default 10
+	help
+	  Maximum time in milliseconds to wait for a SPI command response
+	  from the IWRL6322. Passed to mmWaveULink as h_DeviceRspTimeoutMs.
+
+# ============================================================================
+# Operating mode defaults
+# ============================================================================
+
+config IWRL6322_DEFAULT_MODE
+	int "Default operating mode at startup"
+	range 0 5
+	default 0
+	help
+	  Default operating mode applied at driver initialisation.
+	  0 = STOP (sensor idle after init, user must set mode via attr_set)
+	  1 = RAW_ADC (FE mode, raw ADC data)
+	  2 = 1D_FFT  (FE mode, 1D-FFT processed data)
+	  3 = MPD_PRESENCE (MPD quiet mode, data only when presence detected)
+	  4 = MPD_VERBOSE  (MPD verbose mode, data every frame)
+	  5 = POWER_OFF    (assert nRESET on init)
+
+# ============================================================================
+# Antenna / region
+# ============================================================================
+
+config IWRL6322_ANTENNA_TYPE
+	int "Antenna type (b3_DevAntennaSel)"
+	range 0 3
+	default 0
+	help
+	  0 = AoP module (default)
+	  1 = WCSP 3D antenna
+	  2 = WCSP 2D antenna
+	  3 = WCSP-Z antenna
+
+config IWRL6322_REGION
+	int "Regulatory region (0=FCC, 1=TELEC)"
+	range 0 1
+	default 0
+	help
+	  0 = FCC / CE worldwide operation
+	  1 = Japan TELEC compliance
+
+# ============================================================================
+# FE chirp profile defaults
+# ============================================================================
+
+config IWRL6322_FE_ADC_SAMP_RATE
+	int "FE ADC sampling rate divider (c_AdcSampRate, 8..100)"
+	range 8 100
+	default 16
+
+config IWRL6322_FE_NUM_VIRTUAL_ANT
+	int "FE number of virtual antennas (1..4)"
+	range 1 4
+	default 4
+
+config IWRL6322_FE_TXRX_CH_ENA
+	hex "FE TX/RX channel enable bitmask (h_ChirpTxRxChEnaSel)"
+	default 0xA965
+
+config IWRL6322_FE_NUM_ADC_SAMPLES
+	int "FE number of ADC samples per chirp (32/64/128/256)"
+	range 32 256
+	default 128
+
+config IWRL6322_FE_RAMP_END_TIME
+	int "FE chirp ramp end time (100 ns LSB, range 60..2560)"
+	range 60 2560
+	default 280
+
+config IWRL6322_FE_IDLE_TIME
+	int "FE chirp idle time (100 ns LSB, range 31..10000)"
+	range 31 10000
+	default 1000
+
+config IWRL6322_FE_ADC_SKIP_SAMP
+	int "FE ADC start skip samples (0..63)"
+	range 0 63
+	default 63
+
+config IWRL6322_FE_RF_FREQ_START
+	hex "FE RF start frequency (w_ChirpRfFreqStart)"
+	default 0xC800
+
+config IWRL6322_FE_RF_FREQ_SLOPE
+	int "FE RF frequency slope (xh_ChirpRfFreqSlope, signed, ±13981)"
+	range -13981 13981
+	default 3495
+
+config IWRL6322_FE_TX_START_TIME
+	int "FE TX start time (20 ns LSB, range -300..300)"
+	range -300 300
+	default 0
+
+config IWRL6322_FE_HPF_CORNER
+	int "FE HPF corner frequency (0=175kHz, 1=350kHz, 2=700kHz, 3=1400kHz)"
+	range 0 3
+	default 0
+
+config IWRL6322_FE_CAL_RX_GAIN
+	int "FE calibration RX gain (34..48 dB, even values only)"
+	range 34 48
+	default 36
+
+config IWRL6322_FE_CAL_TX_BACKOFF
+	int "FE calibration TX backoff (0..15 dB)"
+	range 0 15
+	default 0
+
+config IWRL6322_FE_INTER_CHIRP_PS_OVRD
+	int "FE interchirp power save settings"
+	range 0 127
+	default 0
+
+# ============================================================================
+# FE chirp frame defaults
+# ============================================================================
+
+config IWRL6322_FE_CHIRPS_ACCUM
+	int "FE number of chirps to accumulate (0=disabled, 2..64)"
+	range 0 64
+	default 0
+
+config IWRL6322_FE_CHIRPS_PER_BURST
+	int "FE number of chirps per burst (1..1023)"
+	range 1 1023
+	default 128
+
+config IWRL6322_FE_BURST_IDLE_TIME
+	int "FE burst idle time (100 ns LSB, 1500..150000)"
+	range 1500 150000
+	default 8010
+
+config IWRL6322_FE_BURSTS_PER_FRAME
+	int "FE number of bursts per frame (1..127)"
+	range 1 127
+	default 1
+
+config IWRL6322_FE_NUM_FRAMES
+	int "FE number of frames (0=infinite, 1..65535)"
+	range 0 65535
+	default 0
+
+config IWRL6322_FE_FRAME_PERIOD_MS
+	int "FE frame periodicity (ms, 10..21600000)"
+	range 10 21600000
+	default 200
+
+# ============================================================================
+# MPD profile
+# ============================================================================
+
+config IWRL6322_MPD_DETECTION_MODE
+	int "MPD detection mode (1=1VA_1D, 2=2VA_2D, 3=3VA_3D, 4=4VA_3D)"
+	range 1 4
+	default 3
+
+config IWRL6322_MPD_MAX_RANGE
+	int "MPD maximum range (0=4m, 1=8m, 2=12m)"
+	range 0 2
+	default 0
+
+config IWRL6322_MPD_MOTION_SENSITIVITY
+	int "MPD motion sensitivity (0=lowest, 3=highest)"
+	range 0 3
+	default 0
+
+config IWRL6322_MPD_DETECTION_SENSITIVITY
+	int "MPD detection sensitivity level (0..5)"
+	range 0 5
+	default 0
+
+config IWRL6322_MPD_SNR_BOOST
+	int "MPD SNR boost level (0=disabled, 1=level1, 2=level2)"
+	range 0 2
+	default 0
+
+config IWRL6322_MPD_STATIC_REMOVAL
+	bool "MPD enable static object removal"
+	default y
+
+config IWRL6322_MPD_NUM_FRAMES
+	int "MPD number of frames per start command (0=infinite)"
+	range 0 65535
+	default 0
+
+config IWRL6322_MPD_FRAME_PERIOD_MS
+	int "MPD frame periodicity (ms, 1..86400000)"
+	range 1 86400000
+	default 1000
+
+config IWRL6322_MPD_ADV_CFAR_CFG
+	int "MPD advanced CFAR offset (-6..+6, added to nominal LUT value)"
+	range -6 6
+	default 0
+
+config IWRL6322_MPD_MIN_POINTS
+	int "Minimum number of detected points required to form a cluster (1 - 255)"
+	range 1 255
+	default 2
+
+config IWRL6322_MPD_MAX_DISTANCE_CLUSTER
+	int "Maximum distance between detected points for the points to be grouped into the same cluster (1 - 32767, 1 LSB = 1 cm)"
+	range 1 32767
+	default 50
+
+config IWRL6322_MPD_STEER_VEC_EN_CTRL
+	int "Steering vector enable control for this profile. When enabled, the device uses steering vector DPU for angle estimation instead of AOA DPU. (0 = enabled)"
+	range 0 1
+	default 0
+
+# ============================================================================
+# MPD zone configuration
+# ============================================================================
+
+config IWRL6322_MPD_NUM_ZONES
+	int "MPD number of detection zones (1..16)"
+	range 1 16
+	default 1
+
+config IWRL6322_ZONE_COORDINATE_CARTESIAN
+	bool "Use Cartesian coordinates for detection zones (default: Cartesian)"
+	default y
+
+# ============================================================================
+# App config ctrl — miscellaneous flags (U_APP_CFG_CTRL)
+# ============================================================================
+
+config IWRL6322_MPD_SIG_TRIG_TYPE
+	bool "MPD signal trigger type: level (default: pulse)"
+	default n
+
+config IWRL6322_MPD_AUTO_BOOT_MODE
+	bool "MPD auto boot mode (load config + SM from flash on power-up)"
+	default n
+
+config IWRL6322_MCU_CLK_OUT_SEL
+	int "MCU clock output select (0=off, 1=XTAL40M, 2=RC10M, 3=CPU/4)"
+	range 0 3
+	default 0
+
+config IWRL6322_DEEP_SLEEP_ENTRY_DIS
+	bool "Disable automatic deep sleep entry between frames"
+	default y
+
+config IWRL6322_TRIG_BOOT_CAL
+	bool "Trigger factory (boot) calibration on next app-config call"
+	default y
+
+config IWRL6322_HIL_ENABLE
+	bool "Hardware-in-loop enable"
+	default n
+
+config IWRL6322_JTAG_ENABLE
+	bool "JTAG enable"
+	default n
+
+config IWRL6322_XTAL_LESS_MODE
+	bool "XTAL-less clock mode"
+	default n
+
+config IWRL6322_GPIO_MARKER_ENA
+	bool "GPIO marker enable"
+	default n
+
+config IWRL6322_CZ_CW_MODE_ENA
+	bool "CZ/CW mode enable"
+	default n
+
+config IWRL6322_RF_LDO_BYPASS
+	bool "Bypass internal RF LDO (use external 1.0V supply)"
+	default n
+
+config IWRL6322_HOLD_LPDS
+	bool "Hold in LPDS (disable RTC-timer wakeup)"
+	default n
+
+config IWRL6322_FE_CALIB_CTRL
+	hex "FE calibration override control bitmask (h_FeCalibCtrl)"
+	default 0x003C
+
+config IWRL6322_MPD_HOLDTIME_10US
+	int "MPD signal-to-deep-sleep hold time (units of 10 us)"
+	range 4 100000
+	default 1000
+	help
+	  This delay is not applicable in b1_MpdAutoBootMode=1.
+
+# ============================================================================
+# Sensor start/stop — calibration and flash options
+# ============================================================================
+
+config IWRL6322_RUN_CAL_CTRL
+	int "Run calibration control (c_RunCalCtrl, 0=disable, 1=enable)"
+	range 0 1
+	default 1
+
+config IWRL6322_ATTR_MPD_MEAS_PROF_SEL
+	int "MPD measurement profile select (0..3)"
+	range 0 3
+	default 0
+
+config IWRL6322_RUN_CAL_TRIG_INTERVAL
+	int "Periodic runtime calibration interval (0=disabled, 1..255 frames)"
+	range 0 255
+	default 0
+
+config IWRL6322_FLASH_SENS_CFG
+	bool "Flash sensor configuration to device flash (MPD auto-boot prep)"
+	default n
+	
+
+# ============================================================================
+# Reset and power-up timing
+# ============================================================================
+
+config IWRL6322_NRESET_SETUP_TIME_10US
+	int "NRESET assertion hold time (10 us per LSB, 0=use default 20 us)"
+	range 0 255
+	default 0
+
+config IWRL6322_RBL_POWERUP_DELAY_MS
+	int "RBL power-up delay after NRESET deassertion (ms, 0=default 15 ms)"
+	range 0 255
+	default 0
+
+# ============================================================================
+# Power saving
+# ============================================================================
+
+config IWRL6322_POWER_SAVING
+	bool "Power saving (WAKE_UP / ml_devCtrl sleep management)"
+	default y

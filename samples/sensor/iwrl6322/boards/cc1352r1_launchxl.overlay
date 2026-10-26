@@ -1,0 +1,82 @@
+/*
+ * Copyright (c) 2025
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * CC1352P1 LaunchXL board overlay for the TI IWRL6322 mmWave sensor sample.
+ *
+ * Pin wiring (connect to the IWRL6322 breakout via BoosterPack header):
+ *
+ *  BP Header  DIO   Signal              IWRL6322 pin
+ *  ──────────────────────────────────────────────────
+ *  BP-7       DIO10  SPI_CLK (SCK)      CLK
+ *  BP-15      DIO9   SPI_MOSI           MOSI
+ *  BP-14      DIO8   SPI_MISO           MISO
+ *  BP-18      DIO11  SPI_CSN (GPIO CS)  CSN  ← driven by GPIO, not SPI0_FSS hw
+ *  BP-38      DIO20  nRESET             nRESET
+ *  BP-36      DIO18  SPI_BUSY           SPI_BUSY
+ *  BP-5       DIO22  WAKE_UP            WAKE_UP
+ *  BP-29      DIO7   PRESENCE_DETECT    PRESENCE_DETECT
+ *
+ * GPIO flag notes:
+ *   cs-gpios          — GPIO_ACTIVE_LOW: SPI CS is asserted LOW.  Using a
+ *                       GPIO (instead of the SPI0_FSS hardware pin) ensures
+ *                       CS stays asserted for the entire multi-byte packet.
+ *                       The CC1352P1 hardware FSS would deassert between
+ *                       bytes when the TX FIFO drains.
+ *   nreset-gpios      — GPIO_ACTIVE_HIGH: driver uses gpio_pin_set_dt(0)
+ *                       to assert (physical LOW) and gpio_pin_set_dt(1) to
+ *                       release (physical HIGH).
+ *   spi-busy-gpios    — GPIO_ACTIVE_HIGH: TI library polls for return value
+ *                       0 (pin LOW = device ready); gpio_pin_get_dt returns
+ *                       0 for physical LOW when flag is ACTIVE_HIGH.
+ *   wake-up/pres      — GPIO_ACTIVE_HIGH: all driven or read at logical
+ *                       level matching the physical signal level.
+ */
+
+/* Set UART0 (zephyr,console) to 921600 baud for raw data streaming */
+&uart0 {
+	current-speed = <921600>;
+};
+
+&spi0 {
+	/*
+	 * Override pinctrl to remove the hardware SPI0_FSS mux on DIO11.
+	 * CS is instead driven by cs-gpios below (GPIO mode keeps CS asserted
+	 * for the full packet — hardware FSS would deassert per byte).
+	 */
+	pinctrl-0 = <&spi0_sck_default &spi0_mosi_default &spi0_miso_default>;
+    pinctrl-names = "default";	
+	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+
+	mmwave: mmwave@0 {
+		compatible = "ti,mmwave-radar";
+		reg = <0>;
+		spi-max-frequency = <1000000>; /* 1 MHz */
+
+		/*
+		 * nRESET: asserted (low) at init, released (high) at power-up.
+		 * Use ACTIVE_HIGH so gpio_pin_set_dt(0)→LOW and (1)→HIGH.
+		 */
+		nreset-gpios          = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+
+		/*
+		 * SPI_BUSY: device drives LOW when idle/ready.
+		 * Use ACTIVE_HIGH so gpio_pin_get_dt returns 0 when LOW (=ready),
+		 * matching M_RL_SPI_BUSY_LOW expected by the TI library.
+		 */
+		spi-busy-gpios        = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+
+		/* WAKE_UP: assert HIGH to keep device active, deassert to allow deep sleep */
+		wake-up-gpios         = <&gpio0 22 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+
+		/*
+		 * PRESENCE_DETECT: device asserts HIGH on each frame (verbose mode)
+		 * or when occupancy is detected (presence mode).
+		 * Wiring this pin enables SENSOR_TRIG_DATA_READY.
+		 */
+		presence-detect-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+		sop0-gpios = <&gpio0 11 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+		sop1-gpios = <&gpio0 20 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+
+	};
+};

@@ -1,0 +1,89 @@
+# Copyright (c) 2026 Texas Instruments Incorporated
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  Texas Instruments IWRL6322 60-64 GHz mmWave radar sensor.
+
+  The IWRL6322 is an ultra-low-power, single-chip 60-64 GHz radar sensor
+  for presence and motion detection. It communicates over SPI and exposes
+  a point-cloud output stream with up to 7 configurable detection zones.
+
+  The driver supports five operating modes:
+    - STOP (0): no RF emissions
+    - RAW_ADC (1): front-end raw ADC output
+    - 1D_FFT (2): front-end 1D-FFT output
+    - MPD_PRESENCE (3): motion/presence detection, data on presence only
+    - MPD_VERBOSE (4): motion/presence detection, data every frame
+    - POWER_OFF (5): full power-off (nRESET asserted)
+
+  All data is exposed via the Zephyr sensor RTIO async API.
+  Each RTIO buffer begins with a struct iwrl6322_buffer_header.
+
+  Example devicetree node::
+
+    &spi0 {
+        cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+
+        iwrl6322: iwrl6322@0 {
+            compatible = "ti,iwrl6322";
+            reg = <0>;
+            spi-max-frequency = <1000000>;
+
+            nreset-gpios          = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+            spi-busy-gpios        = <&gpio0 7  GPIO_ACTIVE_HIGH>;
+            wake-up-gpios         = <&gpio0 22 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+            presence-detect-gpios = <&gpio0 6  GPIO_ACTIVE_HIGH>;
+            sop0-gpios            = <&gpio0 11 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+            sop1-gpios            = <&gpio0 20 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+        };
+    };
+
+compatible: "ti,iwrl6322"
+
+include: [spi-device.yaml]
+
+properties:
+  nreset-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Active-high nRESET signal. The driver asserts LOW to hold the device in
+      reset and deasserts HIGH to release it. Use GPIO_ACTIVE_HIGH so that
+      gpio_pin_set_dt(1) releases nRESET (physical HIGH).
+
+  spi-busy-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      SPI-busy indicator driven by the device. The device holds this LOW when
+      it is ready to accept a new SPI transaction and HIGH while busy. Use
+      GPIO_ACTIVE_HIGH so that gpio_pin_get_dt() returns 0 when the device is
+      ready (physical LOW), matching the M_RL_SPI_BUSY_LOW expectation of the
+      TI mmWaveULink library.
+
+  wake-up-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Wake-up GPIO driven by the host. Assert HIGH to prevent the device from
+      entering deep sleep; deassert LOW to allow deep sleep entry between frames.
+
+  presence-detect-gpios:
+    type: phandle-array
+    description: |
+      Optional presence-detect / frame-ready output driven by the device.
+      When wired, the driver configures SENSOR_TRIG_DATA_READY on this GPIO.
+      In MPD_PRESENCE mode the pin is asserted on occupancy events; in
+      MPD_VERBOSE mode it is asserted once per frame.
+
+  sop0-gpios:
+    type: phandle-array
+    description: |
+      SOP0 strap GPIO. Must be driven LOW during and immediately after device
+      reset to select the correct boot mode. Optional if the pin is hard-wired
+      on the board; if absent the driver skips SOP0 configuration.
+
+  sop1-gpios:
+    type: phandle-array
+    description: |
+      SOP1 strap GPIO. See sop0-gpios for usage. Optional if hard-wired.
