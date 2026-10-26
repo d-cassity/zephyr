@@ -1,0 +1,45 @@
+# Copyright (c) 2026 Texas Instruments Incorporated
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  # -----------------------------------------------------------------------
+  # Decoder unit tests — pure buffer-parsing logic, no hardware required.
+  #
+  # iwrl6322_decoder.c is compiled directly into the test binary via
+  # CMakeLists.txt.  A minimal stub satisfies the TI library include;
+  # no real SPI, GPIO, or sensor device is instantiated.
+  # -----------------------------------------------------------------------
+  drivers.sensor.iwrl6322.decoder:
+    tags:
+      - drivers
+      - sensor
+    platform_allow:
+      - native_sim
+      - native_sim/native/64
+    harness: ztest
+    extra_configs:
+      - CONFIG_IWRL6322_TEST_DECODER_ONLY=y
+
+  # -----------------------------------------------------------------------
+  # Hardware integration tests — require the IWRL6322 to be physically
+  # connected and powered on the cc1352p1_launchxl board.
+  #
+  # The real driver is enabled via boards/cc1352p1_launchxl.conf
+  # (CONFIG_IWRL6322=y).  attr_set/attr_get roundtrips and driver init
+  # are verified; no RF is activated.
+  # -----------------------------------------------------------------------
+  drivers.sensor.iwrl6322.integration:
+    tags:
+      - drivers
+      - sensor
+      - hardware
+    platform_allow:
+      - cc1352p1_launchxl
+    harness: ztest
+    timeout: 120
+    # Note: on Windows hosts, Twister may fail to build this test due to
+    # MAX_PATH (260-char) limitations in the TI SimpleLink HAL CMakeFiles
+    # directory names.  Build and flash manually with:
+    #   west build -b cc1352p1_launchxl tests/drivers/sensor/iwrl6322
+    #   west flash
+    # This does not affect Linux CI.
