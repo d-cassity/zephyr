@@ -1,0 +1,17 @@
+# Copyright (c) 2026 Texas Instruments Incorporated
+# SPDX-License-Identifier: Apache-2.0
+
+config IWRL6322_TEST_DECODER_ONLY
+	bool "Build only the IWRL6322 decoder unit tests (no hardware required)"
+	default n
+	help
+	  When enabled, only the decoder unit tests are compiled.  The decoder
+	  source (iwrl6322_decoder.c) is compiled directly against a minimal
+	  stub for the TI mmWaveULink types it depends on, allowing the decoder
+	  logic to be exercised on native_sim without any real hardware.
+
+	  When disabled, the hardware integration tests are compiled instead.
+	  These require CONFIG_IWRL6322=y and a physical sensor connected to
+	  the target board.
+
+source "Kconfig.zephyr"

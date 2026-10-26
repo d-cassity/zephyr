@@ -1,0 +1,13 @@
+sample:
+  name: TI IWRL6322 Radar Sensor
+  description: >
+    Demonstrates the TI IWRL6322 mmWave radar sensor driver using the
+    RTIO/async sensor_stream path and the iwrl6322_decoder_api extension to
+    decode MPD point-cloud frames. The IWRL6322 is RTIO-only; 
+    sensor_sample_fetch is not supported.
+tests:
+  sample.sensor.iwrl6322:
+    platform_allow:
+      - cc1352p1_launchxl
+    tags:
+      - sensor

@@ -2564,6 +2564,21 @@ Documentation Infrastructure:
   labels:
     - "area: Timer"
 
+"Drivers: TI IWRL6322 mmWave Radar Sensor":
+  status: maintained
+  maintainers:
+    - d-cassity
+  files:
+    - drivers/sensor/ti/iwrl6322/
+    - tests/drivers/sensor/iwrl6322/
+    - dts/bindings/sensor/ti,iwrl6322.yaml
+  labels:
+    - "area: Sensors"
+  tests:
+    - drivers.sensor.iwrl6322
+  description: >-
+    Driver for the TI IWRL6322 60-64 GHz mmWave radar sensor.
+
 "Drivers: Time Aware GPIO":
   status: maintained
   maintainers:
