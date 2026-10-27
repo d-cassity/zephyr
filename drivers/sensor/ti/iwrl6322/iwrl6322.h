@@ -31,7 +31,7 @@ extern "C" {
 enum iwrl6322_sensor_channel {
 	IWRL6322_CHAN_SENSOR_INFO = SENSOR_CHAN_PRIV_START,
 	IWRL6322_CHAN_PRESENCE,
-	/** Raw GPADC measurement result (w_MeasResVal, 1 LSB = 1.8V/256) */
+	/* Raw GPADC measurement result (w_MeasResVal, 1 LSB = 1.8V/256) */
 	IWRL6322_CHAN_GPADC,
 };
 
@@ -391,6 +391,7 @@ struct iwrl6322_config {
 struct iwrl6322_data {
 	/* ---- TI library state ------------------------------------------- */
 	bool     firmware_loaded;    /* true once RBL download + switch succeeded */
+	bool     cal_data_valid;     /* true once factory cal data retrieved successfully */
 
 	struct k_mutex dev_mutex;
 	struct k_sem dev_sem;
@@ -491,9 +492,7 @@ struct iwrl6322_data {
 	 */
 	struct rtio_iodev_sqe *streaming_sqe;
 
-	/* ------------------------------------------------------------------ */
-	/* FE chirp profile                                                     */
-	/* ------------------------------------------------------------------ */
+	/* FE chirp profile */
 	uint8_t  fe_adc_samp_rate;     /* c_AdcSampRate: effective = 400 MHz / (val * 2) */
 	uint8_t  fe_num_virtual_ant;   /* 1..4 */
 	uint16_t fe_txrx_ch_ena;       /* h_ChirpTxRxChEnaSel bitmask */
@@ -509,9 +508,7 @@ struct iwrl6322_data {
 	uint8_t  fe_cal_tx_backoff;    /* 0..15 dB */
 	uint8_t  fe_inter_chirp_ps_ovrd;
 
-	/* ------------------------------------------------------------------ */
-	/* FE chirp frame                                                       */
-	/* ------------------------------------------------------------------ */
+	/* FE chirp frame */
 	uint8_t  fe_chirps_accum;      /* 0=disabled, 2..64 */
 	uint16_t fe_chirps_per_burst;  /* 1..1023 */
 	uint32_t fe_burst_idle_time;   /* units of 100 ns */
@@ -519,13 +516,7 @@ struct iwrl6322_data {
 	uint16_t fe_num_frames;        /* 0=infinite */
 	uint32_t fe_frame_period_ms;   /* frame period in ms */
 
-	/* ------------------------------------------------------------------ */
-	/* Sensor start/stop calibration and flash options                      */
-	/* ------------------------------------------------------------------ */
-
-	/* ------------------------------------------------------------------ */
 	/* Sensor position and tilt (zone configuration)                        */
-	/* ------------------------------------------------------------------ */
 	int16_t  sens_pos_x_cm;          /* xh_SensPosXRange: ±1500 cm */
 	int16_t  sens_pos_y_cm;          /* xh_SensPosYTheta: ±1500 cm */
 	int16_t  sens_pos_z_cm;          /* xh_SensPosZ: ±1500 cm */
@@ -533,9 +524,7 @@ struct iwrl6322_data {
 	int8_t   sens_tilt_elevation;    /* xc_SensTiltElevation: ±90 deg */
 	int8_t   sens_in_plane_tilt;     /* xc_InPlaneTilt: 0, ±90 deg */
 
-	/* ------------------------------------------------------------------ */
 	/* Reset and power-up timing (init-time only)                           */
-	/* ------------------------------------------------------------------ */
 	uint8_t  nreset_setup_time_10us; /* c_NResetSetupTime10us: 0=default 20 µs */
 	uint8_t  rbl_powerup_delay_ms;   /* c_RblPowerUpDelayMs: 0=default 15 ms */
 

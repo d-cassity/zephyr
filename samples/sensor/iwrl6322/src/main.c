@@ -60,7 +60,8 @@ LOG_MODULE_REGISTER(iwrl6322_sample, LOG_LEVEL_INF);
  * one [iwrl6322_buffer_header + variant-specific payload]. On the 80 KiB
  * cc1352p1_launchxl we can keep four blocks for the small default payload, but
  * a 32 KiB payload only fits as a single in-flight block.
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 SENSOR_DT_STREAM_IODEV(iwrl6322_iodev,
 		       DT_NODELABEL(iwrl6322),
@@ -83,7 +84,7 @@ static const struct device *const fe_raw_uart =
 static const char base64_table[] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-RTIO_DEFINE_WITH_MEMPOOL(iwrl6322_ctx, //TODO CHANGE
+RTIO_DEFINE_WITH_MEMPOOL(iwrl6322_ctx,
 			 /* sq_sz   */ 4,
 			 /* cq_sz   */ 4,
 			 /* num_blks */ RTIO_NUM_BLOCKS,
@@ -92,7 +93,8 @@ RTIO_DEFINE_WITH_MEMPOOL(iwrl6322_ctx, //TODO CHANGE
 
 /* -------------------------------------------------------------------------
  * Sensor configuration
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 static void uart_write_base64(const uint8_t *src, size_t len)
 {
@@ -157,337 +159,14 @@ static void print_fe_raw_base64(const struct iwrl6322_sensor_info *info)
 		}                                                       \
 	} while (0)
 
-// static int configure_sensor(const struct device *dev)
-// {
-// 	struct sensor_value v;
-// 	int ret;
-
-// 	/*
-// 	 * Max range index — NOT a distance in metres.
-// 	 *   0 = 4 m  (default)
-// 	 *   1 = 8 m
-// 	 *   2 = 12 m
-// 	 * Maps to c_MaxRange in the IWRL6322 firmware MPD configuration.
-// 	 */
-// 	v.val1 = 0; /* 4 m */
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      SENSOR_ATTR_FULL_SCALE, &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set max range index: %d", ret);
-// 		return ret;
-// 	}
-
-// 	/*
-// 	 * Update rate in millihertz.
-// 	 * 1000 mHz = 1 Hz → 1000 ms MPD frame period.
-// 	 */
-// 	v.val1 = 1000;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      SENSOR_ATTR_SAMPLING_FREQUENCY, &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set update rate: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_MOTION_SENSITIVITY,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set motion sensitivity: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_DETECTION_SENSITIVITY,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set detection sensitivity: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0; /* IWRL6322_REGION_FCC_CE */
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_REGION,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set region: %d", ret);
-// 		return ret;
-// 	}
-
-// 	/*
-// 	 * MPD measurement profile selection.
-// 	 * 0xAA = M_ML_SENS_MPD_MEAS_AUTO — firmware picks the best profile.
-// 	 * Use a fixed index (0–3) to select a specific profile.
-// 	 */
-// 	v.val1 = 0x0; /* option 0*/
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_MPD_PROF_SEL,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set MPD profile: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 1; /* disabled */
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_RUN_CAL_CTRL,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set boot calib: %d", ret);
-// 		return ret;
-// 	}
-
-// 	/* ------------------------------------------------------------------
-// 	 * App config fields
-// 	 * AOP/Module antenna (0), holdtime 1000×10us, no FE calib override.
-// 	 * ------------------------------------------------------------------ */
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_ANTENNA_TYPE,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set antenna type: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 1000;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_MPD_HOLDTIME_10US,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set MPD holdtime: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_CALIB_CTRL,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE calib ctrl: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 1;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_DEEP_SLEEP_ENTRY_DIS,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set deep sleep entry dis: %d", ret);
-// 		return ret;
-// 	}
-
-// 	/* ------------------------------------------------------------------
-// 	 * FE chirp profile
-// 	 *
-// 	 *  c_AdcSampRate=16        → 12.5 MSPS  (400MHz / (16*2))
-// 	 *  c_NumVirtualAntennas=4
-// 	 *  h_ChirpTxRxChEnaSel=0xA965
-// 	 *  h_NumOfAdcSamples=128
-// 	 *  c_ChirpAdcStartSkipSamp=54
-// 	 *  h_ChirpRampEndTime=246  → 24.6 µs
-// 	 *  h_ChirpIdleTime=531     → 53.1 µs
-// 	 *  w_ChirpRfFreqStart=0xBE00 → ~60 GHz
-// 	 *  xh_ChirpRfFreqSlope=4912  → ~140 MHz/µs up-sweep
-// 	 *  xh_TxStartTime=1        → 20 ns
-// 	 *  c_ChirpRxHpfSel=1       → 350 kHz HPF
-// 	 *  c_CalRxGainSel=42       → 42 dB
-// 	 *  c_CalTxBackOffSelOvr=0  → 0 dB back-off
-// 	 * ------------------------------------------------------------------ */
-// 	v.val1 = 16;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_ADC_SAMP_RATE,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE ADC samp rate: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 4;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_NUM_VIRTUAL_ANT,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE num virtual ant: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0xA965;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_TXRX_CH_ENA,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE TxRx ch ena: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 128;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_NUM_ADC_SAMPLES,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE num ADC samples: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 54;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_ADC_SKIP_SAMP,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE ADC skip samp: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 246;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_RAMP_END_TIME,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE ramp end time: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 531;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_IDLE_TIME,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE idle time: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0x0000BE00;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_RF_FREQ_START,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE RF freq start: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 4912;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_RF_FREQ_SLOPE,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE RF freq slope: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 1;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_TX_START_TIME,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE TX start time: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 1;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_HPF_CORNER,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE HPF corner: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 42;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_CAL_RX_GAIN,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE cal RX gain: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_CAL_TX_BACKOFF,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE cal TX backoff: %d", ret);
-// 		return ret;
-// 	}
-
-// 	/* ------------------------------------------------------------------
-// 	 * FE chirp frame
-// 	 *
-// 	 *  c_NumOfChirpsAccum=0    → accumulation disabled
-// 	 *  h_NumOfChirpsInBurst=4
-// 	 *  w_BurstIdleTime=8011    → 801.1 µs between bursts
-// 	 *  h_NumOfBurstsInFrame=4
-// 	 *  h_NumOfFrames=0         → infinite
-// 	 *  w_FramePeriodicity=500  → 500 ms
-// 	 * ------------------------------------------------------------------ */
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_CHIRPS_ACCUM,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE chirps accum: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 4;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_CHIRPS_PER_BURST,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE chirps per burst: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 8011;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_BURST_IDLE_TIME,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE burst idle time: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 4;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_BURSTS_PER_FRAME,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE bursts per frame: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 0;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_NUM_FRAMES,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE num frames: %d", ret);
-// 		return ret;
-// 	}
-
-// 	v.val1 = 200;
-// 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
-// 			      (enum sensor_attribute)IWRL6322_ATTR_FE_FRAME_PERIOD_MS,
-// 			      &v);
-// 	if (ret < 0) {
-// 		LOG_ERR("Failed to set FE frame period: %d", ret);
-// 		return ret;
-// 	}
-
-// 	return 0;
-// }
-
-
 /* -------------------------------------------------------------------------
  * main
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 int main(void)
 {
-	const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(iwrl6322)); //TODO CHANGE
+	const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(iwrl6322));
 	struct sensor_value attr_val;
 	int ret;
 	uint32_t last_wait_ms = 0;
@@ -511,11 +190,6 @@ int main(void)
 		LOG_ERR("No uDFP Firmware Found");
 	}
 
-	// ret = configure_sensor(dev);
-	// if (ret < 0) {
-	// 	return ret;
-	// }
-
 	/* Explicit stop → start sequence. */
 	attr_val.val1 = IWRL6322_MODE_STOP;
 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
@@ -533,8 +207,9 @@ int main(void)
 	 * completes it from the GPIO ISR workqueue on each DATA_READY rising
 	 * edge, writing the sensor frame directly into the RTIO mempool buffer.
 	 * RTIO re-arms the SQE automatically after each completion.
-	 * ------------------------------------------------------------------ */
-	ret = sensor_stream(&iwrl6322_iodev, &iwrl6322_ctx, NULL, NULL); //TODO CHANGE
+	 * ------------------------------------------------------------------
+	 */
+	ret = sensor_stream(&iwrl6322_iodev, &iwrl6322_ctx, NULL, NULL);
 	if (ret < 0) {
 		LOG_ERR("sensor_stream failed: %d", ret);
 		return ret;
@@ -554,13 +229,14 @@ int main(void)
 
 	/* ------------------------------------------------------------------
 	 * Main loop — consume completed CQEs as they arrive.
-	 * ------------------------------------------------------------------ */
+	 * ------------------------------------------------------------------
+	 */
 	while (1) {
 		struct rtio_cqe *cqe;
 		uint8_t *buf;
 		uint32_t buf_len;
 
-			cqe = rtio_cqe_consume(&iwrl6322_ctx); //TODO CHANGE
+			cqe = rtio_cqe_consume(&iwrl6322_ctx);
 			if (cqe == NULL) {
 				uint32_t now = k_uptime_get_32();
 
@@ -574,15 +250,15 @@ int main(void)
 
 			if (cqe->result < 0) {
 				LOG_ERR("stream error: %d", cqe->result);
-				rtio_cqe_release(&iwrl6322_ctx, cqe); //TODO CHANGE
+				rtio_cqe_release(&iwrl6322_ctx, cqe);
 				continue;
 		}
 
 		/* Extract the buffer pointer from the CQE. */
-		ret = rtio_cqe_get_mempool_buffer(&iwrl6322_ctx, cqe, //TODO CHANGE
+		ret = rtio_cqe_get_mempool_buffer(&iwrl6322_ctx, cqe,
 						  &buf, &buf_len);
 		/* CQE is no longer needed once we have the buffer. */
-		rtio_cqe_release(&iwrl6322_ctx, cqe); //TODO CHANGE
+		rtio_cqe_release(&iwrl6322_ctx, cqe);
 
 			if (ret < 0) {
 				LOG_ERR("get_mempool_buffer failed: %d", ret);
