@@ -32,7 +32,8 @@
 
 /* -------------------------------------------------------------------------
  * Suite fixture — holds the device pointer used by all tests
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 struct iwrl6322_integration_fixture {
 	const struct device *dev;
@@ -53,7 +54,8 @@ ZTEST_SUITE(iwrl6322_integration, NULL, iwrl6322_setup, NULL, NULL, NULL);
 
 /* -------------------------------------------------------------------------
  * Helper: set an attribute and immediately read it back
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 static int attr_roundtrip(const struct device *dev,
 			  enum sensor_attribute attr,
@@ -80,12 +82,14 @@ static int attr_roundtrip(const struct device *dev,
 
 /* -------------------------------------------------------------------------
  * Basic driver / API tests
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST_F(iwrl6322_integration, test_device_is_ready)
 {
 	/* Redundant with the suite setup assertion; kept as an explicit test
-	 * so that the test report names it clearly. */
+	 * so that the test report names it clearly.
+	 */
 	zassert_true(device_is_ready(fixture->dev));
 }
 
@@ -106,7 +110,8 @@ ZTEST_F(iwrl6322_integration, test_sensor_get_decoder)
  * Each test picks a representative value well within the valid range and
  * verifies the driver stores and returns it unchanged.  Out-of-range
  * rejection tests follow in a separate group.
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST_F(iwrl6322_integration, test_attr_region_fcc)
 {
@@ -535,14 +540,16 @@ ZTEST_F(iwrl6322_integration, test_attr_mount_type)
 
 /* test_attr_gpadc_param: omitted — IWRL6322_ATTR_GPADC_PARAM is not yet
  * implemented in the driver (attr_set/attr_get are commented out).
- * Re-enable this test when GPADC support is added. */
+ * Re-enable this test when GPADC support is added.
+ */
 
 /* -------------------------------------------------------------------------
  * Out-of-range rejection tests
  *
  * The driver must return -EINVAL for values outside the documented range.
  * These ensure the driver enforces its own documented constraints.
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST_F(iwrl6322_integration, test_attr_motion_sensitivity_out_of_range)
 {
@@ -590,4 +597,53 @@ ZTEST_F(iwrl6322_integration, test_attr_mpd_adv_cfar_out_of_range)
 				&sv),
 		-EINVAL,
 		"mpd_adv_cfar_cfg=7 must be rejected");
+}
+
+/* -------------------------------------------------------------------------
+ * Factory calibration and inter-chirp power save tests
+ * -------------------------------------------------------------------------
+ */
+
+ZTEST_F(iwrl6322_integration, test_attr_trig_boot_cal)
+{
+	int32_t got;
+
+	/* Enable factory calibration trigger */
+	zassert_ok(attr_roundtrip(fixture->dev,
+				  (enum sensor_attribute)IWRL6322_ATTR_TRIG_BOOT_CAL,
+				  1, &got));
+	zassert_equal(got, 1);
+
+	/* Disable factory calibration trigger */
+	zassert_ok(attr_roundtrip(fixture->dev,
+				  (enum sensor_attribute)IWRL6322_ATTR_TRIG_BOOT_CAL,
+				  0, &got));
+	zassert_equal(got, 0);
+}
+
+ZTEST_F(iwrl6322_integration, test_attr_fe_inter_chirp_ps_ovrd)
+{
+	int32_t got;
+
+	/* Override disabled (bit 0 = 0, default power save applies) */
+	zassert_ok(attr_roundtrip(fixture->dev,
+				  (enum sensor_attribute)IWRL6322_ATTR_FE_INTER_CHIRP_PS_OVRD,
+				  0, &got));
+	zassert_equal(got, 0);
+
+	/*
+	 * Override enabled with all subsystems powered down between chirps:
+	 * bit 0 = override enable
+	 * bit 1 = PA/TX off
+	 * bit 2 = LO/TX off
+	 * bit 3 = RF/RX off
+	 * bit 4 = BB/RX off
+	 * bit 5 = LO/RX off
+	 * bit 6 = synth off
+	 * = 0x7F
+	 */
+	zassert_ok(attr_roundtrip(fixture->dev,
+				  (enum sensor_attribute)IWRL6322_ATTR_FE_INTER_CHIRP_PS_OVRD,
+				  0x7F, &got));
+	zassert_equal(got, 0x7F);
 }

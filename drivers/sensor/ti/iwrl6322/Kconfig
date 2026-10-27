@@ -364,7 +364,6 @@ config IWRL6322_RUN_CAL_TRIG_INTERVAL
 config IWRL6322_FLASH_SENS_CFG
 	bool "Flash sensor configuration to device flash (MPD auto-boot prep)"
 	default n
-	
 
 # ============================================================================
 # Reset and power-up timing

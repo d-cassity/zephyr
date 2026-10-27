@@ -60,9 +60,10 @@ struct iwrl6322_pc_payload_hdr {
 
 /* -------------------------------------------------------------------------
  * Buffer Header Validation
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
-/**
+/*
  * Validate buffer header and return pointer to the payload.
  *
  * @param buffer     RTIO buffer with iwrl6322_buffer_header + payload
@@ -106,7 +107,8 @@ static inline bool is_mpd_mode(uint8_t operating_mode)
 
 /* -------------------------------------------------------------------------
  * Standard sensor_decoder_api callbacks
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 static int iwrl6322_decoder_get_frame_count(const uint8_t *buffer,
 					   struct sensor_chan_spec chan_spec,
@@ -277,7 +279,8 @@ int iwrl6322_decoder_get_sensor_info(const uint8_t *buf, size_t buf_len,
 
 /* -------------------------------------------------------------------------
  * Decoder registration
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 static const struct sensor_decoder_api iwrl6322_decoder = {
 	.get_frame_count = iwrl6322_decoder_get_frame_count,

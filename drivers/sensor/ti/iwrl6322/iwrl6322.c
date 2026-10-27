@@ -57,13 +57,16 @@ static const struct device *g_dev;
 static struct iwrl6322_data *g_priv;
 
 /* Dedicated work queue — keeps sensor SPI work off the system work queue and
- * provides a predictable priority and stack large enough for ml_sensorInfoGetApi(). */
+ * provides a predictable priority and stack large enough for ml_sensorInfoGetApi().
+ */
+
 K_THREAD_STACK_DEFINE(iwrl6322_work_q_stack, CONFIG_IWRL6322_WORK_QUEUE_STACK_SIZE);
 static struct k_work_q iwrl6322_work_q;
 
 /* ============================================================================
  * Internal helpers
- * ========================================================================== */
+ * ============================================================================
+ */
 
 /*
  * Swap adjacent byte pairs in-place for 16-bit MSB-first SPI wire order.
@@ -80,7 +83,8 @@ static void swap_byte_pairs_inplace(uint8_t *buf, uint32_t len)
 
 /* ============================================================================
  * OS Callbacks
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static T_ML_STATUS iwrl6322_mutex_create(T_ML_OS_MUTEX_HANDLE *p_hdl, UINT8 *p_name)
 {
@@ -138,7 +142,8 @@ static T_ML_STATUS iwrl6322_sem_wait(T_ML_OS_SEMAPHORE_HANDLE *p_hdl, UINT32 w_t
 
 /* ============================================================================
  * Platform / Pin Callbacks
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static T_ML_STATUS iwrl6322_blocking_delay(UINT32 w_delayUs)
 {
@@ -276,7 +281,8 @@ static void iwrl6322_unmask_pres_irq(UINT8 c_devIdx)
 
 /* ============================================================================
  * Communication Interface (SPI) Callbacks
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static T_ML_COMM_IF_HANDLE iwrl6322_comm_open(UINT8 c_devIdx, UINT32 w_flags)
 {
@@ -329,7 +335,8 @@ static UINT32 iwrl6322_comm_write(T_ML_COMM_IF_HANDLE *p_hdl,
 	const struct device *dev = (const struct device *)(*p_hdl);
 	const struct iwrl6322_config *cfg = dev->config;
 	/* Stack buffer for byte-swapped TX data — chunks must be even-sized for
-	 * the 16-bit byte-pair swap to stay aligned across chunk boundaries. */
+	 * the 16-bit byte-pair swap to stay aligned across chunk boundaries.
+	 */
 	uint8_t tx_swap[M_RL_MAX_API_PAYLOAD_SIZE + M_RL_PKT_HDR_SIZE + 16U];
 	const uint32_t chunk_max = sizeof(tx_swap);
 	uint32_t offset = 0U;
@@ -432,7 +439,8 @@ static void iwrl6322_build_init_cfg(T_ML_LINK_INIT_CFG *cfg, uint16_t timeout_ms
 
 /* ============================================================================
  * Firmware Loading
- * ========================================================================== */
+ * ============================================================================
+ */
 
 /*
  * Load firmware via the ROM Bootloader (RBL) and switch to application mode.
@@ -445,7 +453,6 @@ static void iwrl6322_build_init_cfg(T_ML_LINK_INIT_CFG *cfg, uint16_t timeout_ms
  *
  * Returns 0 on success, negative errno on failure.
  */
-// const uint8_t iwrl6322_fw_data[] __attribute__((weak));
 const size_t iwrl6322_fw_size = METAIMAGE_SIZE;
 
 static int iwrl6322_load_firmware(const struct device *dev)
@@ -492,7 +499,8 @@ static int iwrl6322_load_firmware(const struct device *dev)
 
 /* ============================================================================
  * Sensor Configuration
- * ========================================================================== */
+ * ============================================================================
+ */
 
 /* Reconstruct the driver-level operating mode from SDK bitfields. */
 static enum iwrl6322_operating_mode iwrl6322_get_mode(const struct iwrl6322_data *data)
@@ -544,6 +552,20 @@ static int iwrl6322_configure(const struct device *dev)
 	T_ML_STATUS ret;
 	ARG_UNUSED(dev);
 
+	/*
+	 * If valid factory cal data was retrieved on a previous configure
+	 * call, restore it to the device now — before ml_devAppConfig —
+	 * and skip re-calibration by clearing trig_boot_cal for this call.
+	 */
+	if (g_priv->cal_data_valid) {
+		T_ML_STATUS cal_ret = ml_devFactCalDataSet(
+			0U, (const T_ML_FE_CAL_DATA *)g_priv->fe_cal_data);
+
+		if (cal_ret != M_RL_RET_CODE_OK) {
+			LOG_WRN("IWRL6322: devFactCalDataSet failed: %d", cal_ret);
+		}
+	}
+
 	/* --- Device application config ------------------------------------ */
 	T_ML_DEVICE_APP_CONFIG app_cfg = {0};
 
@@ -555,19 +577,19 @@ static int iwrl6322_configure(const struct device *dev)
 		g_priv->mpd_sig_trig_type
 		? M_ML_DEV_MPD_SIGNAL_OUT_TRIGTYPE_LEVEL
 		: M_ML_DEV_MPD_SIGNAL_OUT_TRIGTYPE_PULSE;
-	app_cfg.z_AppCfgCtrl.bits.b1_MpdAutoBootMode  	= g_priv->mpd_auto_boot_mode  ? 1U : 0U;
-	app_cfg.z_AppCfgCtrl.bits.b2_McuClkOutSel     	= g_priv->mcu_clk_out_sel; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_DeepSleepEntryDis 	= g_priv->deep_sleep_entry_dis ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b2_GlobalRegion     	= g_priv->region;
-	app_cfg.z_AppCfgCtrl.bits.b1_TrigBootCal      	= g_priv->trig_boot_cal       ? 1U : 0U;
-	app_cfg.z_AppCfgCtrl.bits.b1_HilEnable        	= g_priv->hil_enable           ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_JtagEnable       	= g_priv->jtag_enable          ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_XtalLessModeEna  	= g_priv->xtal_less_mode       ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_GpioMarkerEna    	= g_priv->gpio_marker_ena      ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_CzCwModeEna      	= g_priv->cz_cw_mode_ena       ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_RfLdoBypass      	= g_priv->rf_ldo_bypass        ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_HoldLpds         	= g_priv->hold_lpds            ? 1U : 0U; //ti internal
-	app_cfg.z_AppCfgCtrl.bits.b1_MountType			= g_priv->mount_type           ? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_MpdAutoBootMode	= g_priv->mpd_auto_boot_mode ? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b2_McuClkOutSel		= g_priv->mcu_clk_out_sel;
+	app_cfg.z_AppCfgCtrl.bits.b1_DeepSleepEntryDis	= g_priv->deep_sleep_entry_dis ? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b2_GlobalRegion		= g_priv->region;
+	app_cfg.z_AppCfgCtrl.bits.b1_TrigBootCal	= g_priv->trig_boot_cal	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_HilEnable	= g_priv->hil_enable	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_JtagEnable	= g_priv->jtag_enable	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_XtalLessModeEna	= g_priv->xtal_less_mode	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_GpioMarkerEna	= g_priv->gpio_marker_ena	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_CzCwModeEna	= g_priv->cz_cw_mode_ena	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_RfLdoBypass	= g_priv->rf_ldo_bypass	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_HoldLpds	= g_priv->hold_lpds	? 1U : 0U;
+	app_cfg.z_AppCfgCtrl.bits.b1_MountType	= g_priv->mount_type	? 1U : 0U;
 
 	app_cfg.w_MpdSigOutToDsHoldTime = g_priv->mpd_holdtime_10us;
 	app_cfg.h_FeCalibCtrl = g_priv->fe_calib_ctrl;
@@ -587,9 +609,10 @@ static int iwrl6322_configure(const struct device *dev)
 
 		ret = ml_devFactCalDataGet(0U, (T_ML_FE_CAL_DATA *)g_priv->fe_cal_data);
 		if (ret == M_RL_RET_CODE_OK) {
-			// g_priv->cal_data_valid = true;
+			g_priv->cal_data_valid = true;
 		} else {
 			LOG_WRN("IWRL6322: devFactCalDataGet failed: %d", ret);
+			g_priv->cal_data_valid = false;
 		}
 	}
 
@@ -611,7 +634,7 @@ static int iwrl6322_configure(const struct device *dev)
 		prof.c_ChirpRxHpfSel         = g_priv->fe_hpf_corner;
 		prof.c_CalRxGainSel          = g_priv->fe_cal_rx_gain;
 		prof.c_CalTxBackOffSel	     = g_priv->fe_cal_tx_backoff;
-		prof.c_InterChirpPsOvrd      = g_priv->fe_inter_chirp_ps_ovrd; //todo enable full configuration of this setting
+		prof.c_InterChirpPsOvrd      = g_priv->fe_inter_chirp_ps_ovrd;
 
 		ret = ml_feChirpProfileCfg(0U, &prof);
 		if (ret != M_RL_RET_CODE_OK) {
@@ -729,7 +752,8 @@ static int iwrl6322_configure(const struct device *dev)
 
 /* ============================================================================
  * Sensor Start / Stop
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static int iwrl6322_start_stop(const struct device *dev, uint8_t start)
 {
@@ -757,17 +781,19 @@ static int iwrl6322_start_stop(const struct device *dev, uint8_t start)
 
 	/* After start, deassert WAKE_UP so the device may sleep between frames.
 	 * It will be reasserted in iwrl6322_fetch_data before each SPI transfer.
-	 * Skipped when power saving is disabled — device stays continuously active. */
-	// if (IS_ENABLED(CONFIG_IWRL6322_POWER_SAVING) && start) {
+	 * Skipped when power saving is disabled — device stays continuously active.
+	 */
+	if (IS_ENABLED(CONFIG_IWRL6322_POWER_SAVING) && start) {
 		iwrl6322_wakeup(dev, 0);
-	// }
+	}
 
 	return 0;
 }
 
 /* ============================================================================
  * Data Fetch
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static int iwrl6322_fetch_data(const struct device *dev, void *buf, size_t buf_len)
 {
@@ -830,7 +856,8 @@ static int iwrl6322_fetch_data(const struct device *dev, void *buf, size_t buf_l
 
 /* ============================================================================
  * Attribute Set / Get
- * ========================================================================== */
+ * ============================================================================
+ */
 
 /*
  * Helper: stop sensor, reconfigure with current iwrl6322_data fields, restart.
@@ -886,7 +913,6 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 			if (ml_ret != M_RL_RET_CODE_OK) {
 				LOG_WRN("IWRL6322: mmWaveLinkDeinit failed: %d", ml_ret);
 			}
-			// g_priv->lib_initialized = false;
 			g_priv->firmware_loaded = false;
 			return 0;
 		}
@@ -909,20 +935,6 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 		}
 
 		if (!g_priv->firmware_loaded) {
-			// if (!g_priv->lib_initialized) {
-			// 	T_ML_LINK_INIT_CFG link_cfg;
-
-			// 	iwrl6322_build_init_cfg(&link_cfg, g_priv->api_timeout_ms);
-			// 	T_ML_STATUS ml_ret = ml_mmWaveLinkInit(1U, &link_cfg);
-
-			// 	if (ml_ret != M_RL_RET_CODE_OK) {
-			// 		LOG_ERR("IWRL6322: mmWaveLinkInit (re-init) failed: %d",
-			// 			ml_ret);
-			// 		return -EIO;
-			// 	}
-			// 	g_priv->lib_initialized = true;
-			// }
-
 			const T_ML_DEV_POWER_UP_CFG pwr_down = {
 				.c_PowerControl = 0U,
 				.c_SopBootCfg   = M_ML_DEVICE_SOP_BOOT_SPI_MODE,
@@ -1879,7 +1891,7 @@ static int iwrl6322_attr_get(const struct device *dev, enum sensor_channel chan,
 }
 
 /*
- * Assert (level=1) or deassert (level=0) WAKE_UP, then also update the TI
+ * Assert (level=1) or deassert (level=0) WAKE_UP, then also update TI
  * library's device-control state via ml_devCtrl.
  *
  * Must NOT be called from within a TI library callback (iwrl6322_device_pin_ctrl
@@ -1916,7 +1928,8 @@ void iwrl6322_nreset(const struct device *dev, int level)
 
 /* ============================================================================
  * PRESENCE_DETECT GPIO Interrupt → Zephyr Trigger
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static void iwrl6322_trig_work_handler(struct k_work *work)
 {
@@ -2005,7 +2018,8 @@ static void iwrl6322_pres_det_gpio_cb(const struct device *port,
 
 /* ============================================================================
  * Zephyr Sensor Driver API
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static int iwrl6322_channel_get(const struct device *dev,
 			      enum sensor_channel chan,
@@ -2179,13 +2193,15 @@ static DEVICE_API(sensor, iwrl6322_driver_api) = {
 
 /* ============================================================================
  * Init / Deinit
- * ========================================================================== */
+ * ============================================================================
+ */
 
 static int iwrl6322_struct_init(const struct device *dev)
 {
 	g_priv = dev->data;
 	g_priv->firmware_loaded  = false;
-	
+	g_priv->cal_data_valid   = false;
+
 	/* Device / app config */
 	g_priv->dev_antenna_sel   = CONFIG_IWRL6322_ANTENNA_TYPE;
 	g_priv->mpd_holdtime_10us = CONFIG_IWRL6322_MPD_HOLDTIME_10US;
@@ -2274,7 +2290,8 @@ static int iwrl6322_struct_init(const struct device *dev)
 	g_priv->api_timeout_ms = CONFIG_IWRL6322_API_TIMEOUT_MS;
 
 	/* Initialise runtime config fields from Kconfig defaults.
-	 * attr_set() may override these before the first sensor start. */
+	 * attr_set() may override these before the first sensor start.
+	 */
 	g_priv->max_range_m           		= CONFIG_IWRL6322_MPD_MAX_RANGE;
 	g_priv->motion_sensitivity    		= CONFIG_IWRL6322_MPD_MOTION_SENSITIVITY;
 	g_priv->detection_sensitivity 		= CONFIG_IWRL6322_MPD_DETECTION_SENSITIVITY;
@@ -2317,8 +2334,9 @@ static int __maybe_unused iwrl6322_deinit(const struct device *dev)
 }
 
 /* ============================================================================
- * Initialisation
- * ========================================================================== */
+ * Initialization
+ * ==========================================================================
+ */
 
 static int iwrl6322_init(const struct device *dev)
 {
@@ -2329,9 +2347,7 @@ static int iwrl6322_init(const struct device *dev)
 	/* Register global reference for callbacks before calling the library */
 	g_dev = dev;
 
-	/* ------------------------------------------------------------------ */
-	/* GPIO setup                                                           */
-	/* ------------------------------------------------------------------ */
+	/* -----GPIO setup--------------------------------------------------- */
 
 	if (!spi_is_ready_dt(&cfg->spi)) {
 		LOG_ERR("SPI bus not ready");
@@ -2480,7 +2496,8 @@ static int iwrl6322_init(const struct device *dev)
 
 /* ============================================================================
  * Device Tree Instantiation
- * ========================================================================== */
+ * ============================================================================
+ */
 
 #define IWRL6322_DEFINE(n)                                                        \
 	static struct iwrl6322_data iwrl6322_data_##n;                              \
