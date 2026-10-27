@@ -901,19 +901,24 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 				iwrl6322_start_stop(dev, 0);
 				g_priv->sensor_running = false;
 			}
-			const T_ML_DEV_POWER_UP_CFG pwr_down = {
-				.c_PowerControl = 0U,
-				.c_SopBootCfg   = M_ML_DEVICE_SOP_BOOT_SPI_MODE,
-			};
-			T_ML_STATUS ml_ret = ml_devPwrCtrl(0U, &pwr_down);
-			if (ml_ret != M_RL_RET_CODE_OK) {
-				LOG_ERR("IWRL6322: devPwrCtrl(down) failed: %d", ml_ret);
+			if (g_priv->firmware_loaded) {
+				const T_ML_DEV_POWER_UP_CFG pwr_down = {
+					.c_PowerControl = 0U,
+					.c_SopBootCfg   = M_ML_DEVICE_SOP_BOOT_SPI_MODE,
+				};
+				T_ML_STATUS ml_ret = ml_devPwrCtrl(0U, &pwr_down);
+
+				if (ml_ret != M_RL_RET_CODE_OK) {
+					LOG_ERR("IWRL6322: devPwrCtrl(down) failed: %d",
+						ml_ret);
+				}
+				ml_ret = ml_mmWaveLinkDeinit(1U);
+				if (ml_ret != M_RL_RET_CODE_OK) {
+					LOG_WRN("IWRL6322: mmWaveLinkDeinit failed: %d",
+						ml_ret);
+				}
+				g_priv->firmware_loaded = false;
 			}
-			ml_ret = ml_mmWaveLinkDeinit(1U);
-			if (ml_ret != M_RL_RET_CODE_OK) {
-				LOG_WRN("IWRL6322: mmWaveLinkDeinit failed: %d", ml_ret);
-			}
-			g_priv->firmware_loaded = false;
 			return 0;
 		}
 

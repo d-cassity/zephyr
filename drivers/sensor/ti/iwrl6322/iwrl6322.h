@@ -37,6 +37,14 @@ enum iwrl6322_sensor_channel {
 
 /**
  * @brief Operating mode values for IWRL6322_ATTR_OPERATING_MODE.
+ *
+ * @note Switching between the Front-End (FE) mode family (RAW_ADC, 1D_FFT)
+ * and the MPD mode family (MPD_PRESENCE, MPD_VERBOSE) requires a full device
+ * power cycle.  Before switching families, set the operating mode to
+ * IWRL6322_MODE_POWER_OFF first; the driver will reload the device on the
+ * next mode set.  Switching between modes within the same family (e.g.
+ * RAW_ADC -> 1D_FFT, or MPD_PRESENCE -> MPD_VERBOSE) does not require a
+ * power cycle.
  */
 enum iwrl6322_operating_mode {
 	/** Stop sensor — no RF emissions, no data */
