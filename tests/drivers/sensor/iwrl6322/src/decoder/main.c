@@ -38,7 +38,8 @@
  * is stable and documented in the decoder source; we duplicate it here
  * solely to construct valid test buffers.  A mismatch would be caught by a
  * test failure on the frame count or point data values.
- * ---------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------
+ */
 struct pc_payload_hdr {
 	uint32_t w_FrameCount;
 	uint8_t  c_NumDetPoints;
@@ -48,7 +49,8 @@ struct pc_payload_hdr {
 
 /* -------------------------------------------------------------------------
  * Helpers to build synthetic RTIO buffers
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 /**
  * @brief Fill an iwrl6322_buffer_header in @p buf at offset 0.
@@ -143,13 +145,15 @@ static size_t build_fe_buf(uint8_t *buf, uint8_t operating_mode,
 
 /* -------------------------------------------------------------------------
  * Test suite setup
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST_SUITE(iwrl6322_decoder, NULL, NULL, NULL, NULL, NULL);
 
 /* -------------------------------------------------------------------------
  * get_frame_count tests
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST(iwrl6322_decoder, test_get_frame_count_mpd_presence)
 {
@@ -291,7 +295,8 @@ ZTEST(iwrl6322_decoder, test_get_frame_count_wrong_chan)
 
 /* -------------------------------------------------------------------------
  * get_size_info tests
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST(iwrl6322_decoder, test_get_size_info_sensor_info_chan)
 {
@@ -327,7 +332,8 @@ ZTEST(iwrl6322_decoder, test_get_size_info_unsupported_chan)
 
 /* -------------------------------------------------------------------------
  * decode() tests
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST(iwrl6322_decoder, test_decode_mpd_single_batch)
 {
@@ -466,7 +472,8 @@ ZTEST(iwrl6322_decoder, test_decode_bad_magic)
 
 /* -------------------------------------------------------------------------
  * get_sensor_info tests
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST(iwrl6322_decoder, test_get_sensor_info_mpd)
 {
@@ -550,7 +557,8 @@ ZTEST(iwrl6322_decoder, test_get_sensor_info_unsupported_mode)
 	struct iwrl6322_sensor_info info;
 
 	/* Build a header with STOP mode and a non-zero payload_size so the
-	 * length check passes, then verify the mode rejection. */
+	 * length check passes, then verify the mode rejection.
+	 */
 	fill_header(buf, IWRL6322_MODE_STOP, 16, 0);
 
 	/*
@@ -564,7 +572,8 @@ ZTEST(iwrl6322_decoder, test_get_sensor_info_unsupported_mode)
 
 /* -------------------------------------------------------------------------
  * Buffer magic / IWRL6322_BUFFER_MAGIC constant test
- * ---------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------
+ */
 
 ZTEST(iwrl6322_decoder, test_buffer_magic_value)
 {
