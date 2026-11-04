@@ -1,0 +1,52 @@
+/*
+ * Copyright (c) 2026 Texas Instruments Incorporated
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * LP-EM-CC2340R53 board overlay for the IWRL6322 sensor sample.
+ *
+ * Pin wiring (BoosterPack header -> IWRL6322):
+ *
+ *  DIO   BP Header  Signal              IWRL6322 pin
+ *  ------------------------------------------------
+ *  DIO18  BP-7      SPI_CLK (SCK)       CLK
+ *  DIO13  BP-15     SPI_MOSI            MOSI
+ *  DIO12  BP-14     SPI_MISO            MISO
+ *  DIO15  BP-38     SPI_CS              CS    <- GPIO CS via cs-gpios
+ *  DIO19  BP-17     nRESET              nRESET
+ *  DIO9   BP-8      SPI_BUSY            MCU_DEVICE_BUSY
+ *  DIO4   BP-5      WAKE_UP             WAKE_UP0
+ *  DIO8   BP-36     PRESENCE_DETECT     PRESENCE_DETECT
+ *  DIO21  BP-37     SOP0                SOP0  (pull-down -> SPI boot mode)
+ *  DIO5   BP-27     SOP1                SOP1  (pull-down -> SPI boot mode)
+ *
+ * The board's pinctrl-0 for spi0 includes a 4th CS pin (DIO6) which causes
+ * the SPI driver to use hardware CS instead of the GPIO CS on DIO15.
+ * Override pinctrl-0 with a 3-pin state (SCK, MOSI, MISO only) so the driver
+ * falls through to use cs-gpios for chip select.
+ */
+
+#include <zephyr/dt-bindings/pinctrl/cc23x0-pinctrl.h>
+
+/* Remove the on-board flash so IWRL6322 can take CS index 0. */
+/delete-node/ &mx25r80;
+
+&spi0 {
+	/* 3-pin pinctrl — no HW CS pin, driver uses cs-gpios */
+	pinctrl-0 = <&spi0_sck_default &spi0_mosi_default &spi0_miso_default>;
+	pinctrl-1 = <&spi0_sck_sleep &spi0_mosi_sleep &spi0_miso_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+
+	iwrl6322: iwrl6322@0 {
+		compatible = "ti,iwrl6322";
+		reg = <0>;
+		spi-max-frequency = <1000000>; /* 1 MHz */
+
+		nreset-gpios          = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+		spi-busy-gpios        = <&gpio0 9  GPIO_ACTIVE_HIGH>;
+		wake-up-gpios         = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		presence-detect-gpios = <&gpio0 8  GPIO_ACTIVE_HIGH>;
+		sop0-gpios            = <&gpio0 21 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+		sop1-gpios            = <&gpio0 5  (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+	};
+};
