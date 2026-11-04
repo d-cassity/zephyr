@@ -45,7 +45,7 @@
 	 * for the full packet — hardware FSS would deassert per byte).
 	 */
 	pinctrl-0 = <&spi0_sck_default &spi0_mosi_default &spi0_miso_default>;
-    pinctrl-names = "default";	
+    	pinctrl-names = "default";
 	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
 
 	iwrl6322: iwrl6322@0 {

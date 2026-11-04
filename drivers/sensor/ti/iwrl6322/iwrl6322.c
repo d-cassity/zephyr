@@ -41,7 +41,7 @@
 #include <radarlink/include/rl_interface.h>
 #include <radarlink/include/rl_host.h>
 
-LOG_MODULE_DECLARE(ti_iwrl6322, CONFIG_SENSOR_LOG_LEVEL);
+LOG_MODULE_REGISTER(ti_iwrl6322, CONFIG_SENSOR_LOG_LEVEL);
 
 /*
  * Module-level device reference for platform/OS callbacks.
@@ -253,18 +253,31 @@ static T_ML_STATUS iwrl6322_wait_pin_status(UINT8 c_devIdx, UINT8 c_pinName,
 	}
 
 	uint32_t elapsed = 0U;
-	const uint32_t step_us = 10U;
+	const uint32_t step_us = 1U;
+	int first_val = gpio_pin_get_dt(gpio);
+	int ct = 0;
 
+	/* Read IOC and GPIO DIN registers directly for diagnosis */
+	uint32_t ioc_val = sys_read32(0x40003100U + (4U * (uint32_t)gpio->pin));
+	uint32_t din_val = sys_read32(0x40023000U + 0x700U); /* GPIO_O_DIN31_0 */
+	// LOG_INF("wait_pin pin=%d want=%d first_val=%d timeout=%u ioc=0x%08x din=0x%08x",
+	// 	gpio->pin, c_pinState, first_val, w_timeoutUs, ioc_val, din_val);
+
+	int val;
 	while (elapsed < w_timeoutUs) {
-		int val = gpio_pin_get_dt(gpio);
+		val = gpio_pin_get_dt(gpio);
+		ct++;
 
 		if (val == (int)c_pinState) {
+			// LOG_INF("wait_pin SUCCESS elapsed=%u", elapsed);
 			return M_RL_RET_CODE_OK;
 		}
 		k_busy_wait(step_us);
 		elapsed += step_us;
 	}
 
+	// LOG_INF("wait_pin TIMEOUT pin=%d last_val=%d new_val=%d elapsed=%d",
+		// gpio->pin, val, gpio_pin_get_dt(gpio), elapsed);
 	return M_RL_RET_CODE_SPIBUSY_TIMEOUT;
 }
 
@@ -2382,6 +2395,8 @@ static int iwrl6322_init(const struct device *dev)
 		LOG_ERR("SPI_BUSY configure failed: %d", ret);
 		return ret;
 	}
+	LOG_ERR("SPI_BUSY pin=%d init_val=%d", cfg->spi_busy_gpio.pin,
+		gpio_pin_get_dt(&cfg->spi_busy_gpio));
 
 	/* PRESENCE_DETECT: optional input with edge interrupt */
 	if (cfg->pres_det_gpio.port != NULL) {
@@ -2477,7 +2492,7 @@ static int iwrl6322_init(const struct device *dev)
 			return ret;
 		}
 	}
-
+	
 	k_work_init(&data->trig_work, iwrl6322_trig_work_handler);
 
 	static const struct k_work_queue_config wq_cfg = {
@@ -2504,29 +2519,19 @@ static int iwrl6322_init(const struct device *dev)
  * ============================================================================
  */
 
-#define IWRL6322_DEFINE(n)                                                        \
-	static struct iwrl6322_data iwrl6322_data_##n;                              \
+#define IWRL6322_DEFINE(n) \
+	static struct iwrl6322_data iwrl6322_data_##n; \
                                                                                 \
-	static const struct iwrl6322_config iwrl6322_config_##n = {                 \
-		.spi = SPI_DT_SPEC_INST_GET(                                    \
-			n,                                                      \
-			SPI_OP_MODE_MASTER | SPI_WORD_SET(8) |                  \
-			SPI_TRANSFER_MSB),                                      \
-		.spi_busy_gpio = GPIO_DT_SPEC_INST_GET(n, spi_busy_gpios),     \
+	static const struct iwrl6322_config iwrl6322_config_##n = { \
+		.spi = SPI_DT_SPEC_INST_GET(n, SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB), \
+		.spi_busy_gpio = GPIO_DT_SPEC_INST_GET(n, spi_busy_gpios), \
 		.nreset_gpio   = GPIO_DT_SPEC_INST_GET_OR(n, nreset_gpios, {0}), \
-		.wake_up_gpio  = GPIO_DT_SPEC_INST_GET_OR(                     \
-			n, wake_up_gpios, {0}),                                 \
-		.pres_det_gpio = GPIO_DT_SPEC_INST_GET_OR(                     \
-			n, presence_detect_gpios, {0}),                         \
+		.wake_up_gpio  = GPIO_DT_SPEC_INST_GET_OR(n, wake_up_gpios, {0}), \
+		.pres_det_gpio = GPIO_DT_SPEC_INST_GET_OR(n, presence_detect_gpios, {0}), \
 		.sop0_gpio     = GPIO_DT_SPEC_INST_GET_OR(n, sop0_gpios, {0}), \
 		.sop1_gpio     = GPIO_DT_SPEC_INST_GET_OR(n, sop1_gpios, {0}), \
-	};                                                                      \
+	}; \
                                                                                 \
-	SENSOR_DEVICE_DT_INST_DEFINE(                                           \
-		n,                                                              \
-		iwrl6322_init, NULL,                                              \
-		&iwrl6322_data_##n, &iwrl6322_config_##n,                           \
-		POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY,                       \
-		&iwrl6322_driver_api);
+	SENSOR_DEVICE_DT_INST_DEFINE(n, iwrl6322_init, NULL, &iwrl6322_data_##n, &iwrl6322_config_##n, POST_KERNEL, CONFIG_SENSOR_INIT_PRIORITY, &iwrl6322_driver_api);
 
 DT_INST_FOREACH_STATUS_OKAY(IWRL6322_DEFINE)
