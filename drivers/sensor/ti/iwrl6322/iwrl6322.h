@@ -442,7 +442,7 @@ struct iwrl6322_data {
 	bool     cz_cw_mode_ena;       /* b1_CzCwModeEna */
 	bool     rf_ldo_bypass;        /* b1_RfLdoBypass */
 	bool     hold_lpds;            /* b1_HoldLpds: disable RTC wakeup from LPDS */
-	bool	mount_type;				/* b1_MountType: 0 = wall-mount, 1 = ceiling-mount*/
+	bool	 mount_type;				/* b1_MountType: 0 = wall-mount, 1 = ceiling-mount*/
 	
 	uint32_t mpd_holdtime_10us;  /* MPD signal-to-deep-sleep hold time, units of 10 µs */
 	uint16_t fe_calib_ctrl;      /* h_FeCalibCtrl bitmask */
