@@ -254,30 +254,15 @@ static T_ML_STATUS iwrl6322_wait_pin_status(UINT8 c_devIdx, UINT8 c_pinName,
 
 	uint32_t elapsed = 0U;
 	const uint32_t step_us = 1U;
-	int first_val = gpio_pin_get_dt(gpio);
-	int ct = 0;
 
-	/* Read IOC and GPIO DIN registers directly for diagnosis */
-	uint32_t ioc_val = sys_read32(0x40003100U + (4U * (uint32_t)gpio->pin));
-	uint32_t din_val = sys_read32(0x40023000U + 0x700U); /* GPIO_O_DIN31_0 */
-	// LOG_INF("wait_pin pin=%d want=%d first_val=%d timeout=%u ioc=0x%08x din=0x%08x",
-	// 	gpio->pin, c_pinState, first_val, w_timeoutUs, ioc_val, din_val);
-
-	int val;
 	while (elapsed < w_timeoutUs) {
-		val = gpio_pin_get_dt(gpio);
-		ct++;
-
-		if (val == (int)c_pinState) {
-			// LOG_INF("wait_pin SUCCESS elapsed=%u", elapsed);
+		if (gpio_pin_get_dt(gpio) == (int)c_pinState) {
 			return M_RL_RET_CODE_OK;
 		}
 		k_busy_wait(step_us);
 		elapsed += step_us;
 	}
 
-	// LOG_INF("wait_pin TIMEOUT pin=%d last_val=%d new_val=%d elapsed=%d",
-		// gpio->pin, val, gpio_pin_get_dt(gpio), elapsed);
 	return M_RL_RET_CODE_SPIBUSY_TIMEOUT;
 }
 
@@ -1070,7 +1055,9 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 		break;
 
 	case IWRL6322_ATTR_REGION:
-		if (val->val1 != IWRL6322_REGION_FCC_CE && val->val1 != IWRL6322_REGION_TELEC) {
+		if (val->val1 != IWRL6322_REGION_FCC_CE &&
+		    val->val1 != IWRL6322_REGION_FCC_OUTDOOR &&
+		    val->val1 != IWRL6322_REGION_TELEC) {
 			return -EINVAL;
 		}
 		g_priv->region = (uint8_t)val->val1;
@@ -2395,8 +2382,6 @@ static int iwrl6322_init(const struct device *dev)
 		LOG_ERR("SPI_BUSY configure failed: %d", ret);
 		return ret;
 	}
-	LOG_ERR("SPI_BUSY pin=%d init_val=%d", cfg->spi_busy_gpio.pin,
-		gpio_pin_get_dt(&cfg->spi_busy_gpio));
 
 	/* PRESENCE_DETECT: optional input with edge interrupt */
 	if (cfg->pres_det_gpio.port != NULL) {

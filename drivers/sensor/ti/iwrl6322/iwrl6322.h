@@ -63,10 +63,17 @@ enum iwrl6322_operating_mode {
 
 /**
  * @brief Regulatory region values.
+ *
+ * Values match the mmWaveULink M_ML_DEV_REGION_* definitions and are written
+ * unchanged to U_APP_CFG_CTRL b2_GlobalRegion.
  */
 enum iwrl6322_region {
-	IWRL6322_REGION_FCC_CE = 0,
-	IWRL6322_REGION_TELEC  = 1,
+	/** FCC indoor (M_ML_DEV_REGION_FCC_INDOOR) */
+	IWRL6322_REGION_FCC_CE      = 0,
+	/** FCC outdoor (M_ML_DEV_REGION_FCC_OUTDOOR) */
+	IWRL6322_REGION_FCC_OUTDOOR = 1,
+	/** Japan TELEC (M_ML_DEV_REGION_TELEC) */
+	IWRL6322_REGION_TELEC       = 2,
 };
 
 /**

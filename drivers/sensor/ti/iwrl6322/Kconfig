@@ -89,12 +89,14 @@ config IWRL6322_ANTENNA_TYPE
 	  3 = WCSP-Z antenna
 
 config IWRL6322_REGION
-	int "Regulatory region (0=FCC, 1=TELEC)"
-	range 0 1
+	int "Regulatory region (0=FCC indoor, 1=FCC outdoor, 2=TELEC)"
+	range 0 2
 	default 0
 	help
-	  0 = FCC / CE worldwide operation
-	  1 = Japan TELEC compliance
+	  Written to U_APP_CFG_CTRL b2_GlobalRegion (M_ML_DEV_REGION_*).
+	  0 = FCC indoor
+	  1 = FCC outdoor
+	  2 = Japan TELEC compliance
 
 # ============================================================================
 # FE chirp profile defaults
