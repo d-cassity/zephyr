@@ -217,7 +217,7 @@ int main(void)
 
 	LOG_INF("Stream started — waiting for DATA_READY triggers...");
 
-	attr_val.val1 = IWRL6322_MODE_RAW_ADC;
+	attr_val.val1 = IWRL6322_MODE_MPD_VERBOSE;
 	ret = sensor_attr_set(dev, SENSOR_CHAN_ALL,
 			      (enum sensor_attribute)IWRL6322_ATTR_OPERATING_MODE,
 			      &attr_val);
