@@ -2419,32 +2419,6 @@ static int iwrl6322_init(const struct device *dev)
 			LOG_ERR("SOP0 GPIO not ready");
 			return -ENODEV;
 		}
-		ret = gpio_pin_configure_dt(&cfg->sop0_gpio, GPIO_OUTPUT_ACTIVE);
-		if (ret < 0) {
-			LOG_ERR("SOP0 configure failed: %d", ret);
-			return ret;
-		}
-	}
-
-	/* SOP1: optional output, initially low — boot mode select */
-	if (cfg->sop1_gpio.port != NULL) {
-		if (!gpio_is_ready_dt(&cfg->sop1_gpio)) {
-			LOG_ERR("SOP1 GPIO not ready");
-			return -ENODEV;
-		}
-		ret = gpio_pin_configure_dt(&cfg->sop1_gpio, GPIO_OUTPUT_ACTIVE);
-		if (ret < 0) {
-			LOG_ERR("SOP1 configure failed: %d", ret);
-			return ret;
-		}
-	}
-
-		/* SOP0: optional output, initially low — boot mode select */
-	if (cfg->sop0_gpio.port != NULL) {
-		if (!gpio_is_ready_dt(&cfg->sop0_gpio)) {
-			LOG_ERR("SOP0 GPIO not ready");
-			return -ENODEV;
-		}
 		ret = gpio_pin_configure_dt(&cfg->sop0_gpio, GPIO_OUTPUT_INACTIVE);
 		if (ret < 0) {
 			LOG_ERR("SOP0 configure failed: %d", ret);
@@ -2452,7 +2426,7 @@ static int iwrl6322_init(const struct device *dev)
 		}
 	}
 
-	/* SOP1: optional output, initially low — boot mode select */
+	/* SOP1: optional output, driven low (SPI boot mode) while nRESET is held */
 	if (cfg->sop1_gpio.port != NULL) {
 		if (!gpio_is_ready_dt(&cfg->sop1_gpio)) {
 			LOG_ERR("SOP1 GPIO not ready");
@@ -2465,7 +2439,7 @@ static int iwrl6322_init(const struct device *dev)
 		}
 	}
 
-	/* Pull WAKE_UP low again to see if the line will actually go low */
+	/* WAKE_UP: optional output, initially low */
 	if (cfg->wake_up_gpio.port != NULL) {
 		if (!gpio_is_ready_dt(&cfg->wake_up_gpio)) {
 			LOG_ERR("WAKE_UP GPIO not ready");
