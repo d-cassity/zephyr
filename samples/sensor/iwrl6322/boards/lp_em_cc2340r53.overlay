@@ -4,25 +4,28 @@
  *
  * LP-EM-CC2340R53 board overlay for the IWRL6322 sensor sample.
  *
- * Pin wiring (BoosterPack header -> IWRL6322):
+ * Pin wiring (DIO number -> IWRL6322 signal):
  *
- *  DIO   BP Header  Signal              IWRL6322 pin
- *  ------------------------------------------------
- *  DIO18  BP-7      SPI_CLK (SCK)       CLK
- *  DIO13  BP-15     SPI_MOSI            MOSI
- *  DIO12  BP-14     SPI_MISO            MISO
- *  DIO15  BP-38     SPI_CS              CS    <- GPIO CS via cs-gpios
- *  DIO19  BP-17     nRESET              nRESET
- *  DIO9   BP-8      SPI_BUSY            MCU_DEVICE_BUSY
- *  DIO4   BP-5      WAKE_UP             WAKE_UP0
- *  DIO8   BP-36     PRESENCE_DETECT     PRESENCE_DETECT
- *  DIO21  BP-37     SOP0                SOP0  (pull-down -> SPI boot mode)
- *  DIO5   BP-27     SOP1                SOP1  (pull-down -> SPI boot mode)
+ *  DIO18  SPI_CLK          CLK    (board pinctrl: spi0_sck_default)
+ *  DIO13  SPI_MOSI         MOSI   (board pinctrl: spi0_mosi_default)
+ *  DIO12  SPI_MISO         MISO   (board pinctrl: spi0_miso_default)
+ *  DIO15  SPI_CS           CSN    driven as a GPIO via cs-gpios
+ *  DIO19  nRESET           nRESET
+ *  DIO9   SPI_BUSY         MCU_DEVICE_BUSY
+ *  DIO14  WAKE_UP          WAKE_UP (SOP1 on the breakout)
+ *  DIO8   PRESENCE_DETECT  PRESENCE_DETECT / HOST_IRQ
+ *  DIO21  SOP0             SOP0 (pull-down -> SPI boot mode)
+ *  DIO5   SOP1             SOP1 (pull-down -> SPI boot mode)
  *
- * The board's pinctrl-0 for spi0 includes a 4th CS pin (DIO6) which causes
- * the SPI driver to use hardware CS instead of the GPIO CS on DIO15.
- * Override pinctrl-0 with a 3-pin state (SCK, MOSI, MISO only) so the driver
- * falls through to use cs-gpios for chip select.
+ * The board's pinctrl-0 for spi0 includes a 4th CS pin (DIO6), which makes
+ * the SPI driver use hardware CS instead of the GPIO CS on DIO15.  pinctrl-0
+ * is therefore overridden with a 3-pin state (SCK, MOSI, MISO only) so the
+ * driver falls back to cs-gpios.  The board defines a "sleep" pinctrl state
+ * as well, so pinctrl-1 and pinctrl-names are overridden to match.
+ *
+ * Power: the IWRL6322 draws noticeably more current once MPD processing is
+ * running.  If the board powers the radar through a jump-start USB cable,
+ * leave that cable connected, otherwise the supply can sag.
  */
 
 #include <zephyr/dt-bindings/pinctrl/cc23x0-pinctrl.h>

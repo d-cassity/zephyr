@@ -4,33 +4,36 @@
  *
  * CC1352P1 LaunchXL board overlay for the TI IWRL6322 mmWave sensor sample.
  *
- * Pin wiring (connect to the IWRL6322 breakout via BoosterPack header):
+ * Pin wiring (DIO number -> IWRL6322 signal):
  *
- *  BP Header  DIO   Signal              IWRL6322 pin
- *  ──────────────────────────────────────────────────
- *  BP-7       DIO10  SPI_CLK (SCK)      CLK
- *  BP-15      DIO9   SPI_MOSI           MOSI
- *  BP-14      DIO8   SPI_MISO           MISO
- *  BP-18      DIO11  SPI_CSN (GPIO CS)  CSN  ← driven by GPIO, not SPI0_FSS hw
- *  BP-38      DIO20  nRESET             nRESET
- *  BP-36      DIO18  SPI_BUSY           SPI_BUSY
- *  BP-5       DIO22  WAKE_UP            WAKE_UP
- *  BP-29      DIO7   PRESENCE_DETECT    PRESENCE_DETECT
+ *  DIO8   SPI_MISO         MISO   (board pinctrl: spi0_miso_default)
+ *  DIO9   SPI_MOSI         MOSI   (board pinctrl: spi0_mosi_default)
+ *  DIO10  SPI_CLK          CLK    (board pinctrl: spi0_sck_default)
+ *  DIO15  SPI_CS           CSN    driven as a GPIO via cs-gpios
+ *  DIO19  nRESET           nRESET
+ *  DIO7   SPI_BUSY         MCU_DEVICE_BUSY
+ *  DIO22  WAKE_UP          WAKE_UP (SOP1 on the breakout)
+ *  DIO6   PRESENCE_DETECT  PRESENCE_DETECT / HOST_IRQ
+ *  DIO11  SOP0             SOP0 (pull-down -> SPI boot mode)
+ *  DIO20  SOP1             SOP1 (pull-down -> SPI boot mode)
  *
  * GPIO flag notes:
- *   cs-gpios          — GPIO_ACTIVE_LOW: SPI CS is asserted LOW.  Using a
- *                       GPIO (instead of the SPI0_FSS hardware pin) ensures
- *                       CS stays asserted for the entire multi-byte packet.
- *                       The CC1352P1 hardware FSS would deassert between
- *                       bytes when the TX FIFO drains.
- *   nreset-gpios      — GPIO_ACTIVE_HIGH: driver uses gpio_pin_set_dt(0)
- *                       to assert (physical LOW) and gpio_pin_set_dt(1) to
- *                       release (physical HIGH).
- *   spi-busy-gpios    — GPIO_ACTIVE_HIGH: TI library polls for return value
- *                       0 (pin LOW = device ready); gpio_pin_get_dt returns
- *                       0 for physical LOW when flag is ACTIVE_HIGH.
- *   wake-up/pres      — GPIO_ACTIVE_HIGH: all driven or read at logical
- *                       level matching the physical signal level.
+ *   cs-gpios          - GPIO_ACTIVE_LOW: SPI CS is asserted LOW.  A GPIO is
+ *                       used instead of the SPI0_FSS hardware pin so that CS
+ *                       stays asserted for the entire multi-byte packet; the
+ *                       CC1352P1 hardware FSS would deassert between bytes
+ *                       when the TX FIFO drains.
+ *   nreset-gpios      - GPIO_ACTIVE_HIGH: gpio_pin_set_dt(0) drives the pin
+ *                       LOW (reset asserted), gpio_pin_set_dt(1) releases it.
+ *   spi-busy-gpios    - GPIO_ACTIVE_HIGH: the pin idles HIGH between
+ *                       transactions; the TI library waits for LOW before a
+ *                       command and HIGH before the next transfer.
+ *   wake-up/pres      - GPIO_ACTIVE_HIGH: read or driven at the physical level.
+ *
+ * Power: the IWRL6322 draws noticeably more current once MPD processing is
+ * running.  If the board powers the radar through a jump-start USB cable,
+ * leave that cable connected, otherwise the supply can sag and drop the
+ * LaunchPad off USB.
  */
 
 /* Set UART0 (zephyr,console) to 921600 baud for raw data streaming */
@@ -60,9 +63,9 @@
 		nreset-gpios          = <&gpio0 19 GPIO_ACTIVE_HIGH>;
 
 		/*
-		 * SPI_BUSY: device drives LOW when idle/ready.
-		 * Use ACTIVE_HIGH so gpio_pin_get_dt returns 0 when LOW (=ready),
-		 * matching M_RL_SPI_BUSY_LOW expected by the TI library.
+		 * SPI_BUSY: idles HIGH between transactions.
+		 * ACTIVE_HIGH so gpio_pin_get_dt returns the physical level that
+		 * the TI library waits on (LOW before a command, HIGH after).
 		 */
 		spi-busy-gpios        = <&gpio0 7 GPIO_ACTIVE_HIGH>;
 
