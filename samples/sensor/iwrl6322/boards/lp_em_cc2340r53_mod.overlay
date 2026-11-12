@@ -13,9 +13,9 @@
  *  DIO12  BP-14     SPI_MISO            MISO
  *  DIO10  BP-18     SPI_CS              CS    <- GPIO CS via cs-gpios
  *  DIO6   BP-38     nRESET              nRESET
- *  DIO15  BP-8      SPI_BUSY            MCU_DEVICE_BUSY
  *  DIO19  BP-5      WAKE_UP / SOP1      WAKE_UP (dual-use: also SOP1)
  *  DIO14  BP-36     PRESENCE_DETECT     PRESENCE_DETECT
+ *  DIO15  (header)  SPI_BUSY            MCU_DEVICE_BUSY
  *  DIO11  (header)  SOP0                MCU_HOSTIRQ_SOP0 (boot: SOP0, run: HOST_IRQ)
  *
  * The board's pinctrl-0 for spi0 includes a 4th CS pin which causes the SPI
@@ -24,8 +24,8 @@
  * through to use cs-gpios for chip select.
  *
  * DIO19 is dual-use: driven as SOP1 (output low) at boot, then reasserted as
- * WAKE_UP during operation.  DIO11 is driven low as SOP0 at boot, then
- * reconfigured as input (HOST_IRQ / PRESENCE_DETECT) after boot.
+ * WAKE_UP during operation.  DIO11 is only listed as sop0-gpios; it is driven
+ * low at boot and left as an output (HOST_IRQ is not used by the driver).
  */
 
 #include <zephyr/dt-bindings/pinctrl/cc23x0-pinctrl.h>
@@ -46,9 +46,9 @@
 		spi-max-frequency = <1000000>; /* 1 MHz */
 
 		nreset-gpios          = <&gpio0 6  GPIO_ACTIVE_HIGH>;
-		spi-busy-gpios        = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+		spi-busy-gpios        = <&gpio0 15 GPIO_ACTIVE_HIGH>;  /* MCU_DEVICE_BUSY */
 		wake-up-gpios         = <&gpio0 19 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
-		presence-detect-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
+		presence-detect-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
 		sop0-gpios            = <&gpio0 11 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
 		sop1-gpios            = <&gpio0 19 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
 	};
