@@ -19,21 +19,6 @@
  *
  * The IWRL6322 driver is RTIO-only.  sensor_sample_fetch / sensor_channel_get
  * are not supported — use sensor_stream / sensor_read instead.
- *
- * Configuration
- * ─────────────
- *   • Operating mode: MPD Verbose (reports every frame)
- *   • Max range index: 0 (4 m)  ← index, not metres; 1=8m, 2=12m
- *   • Update rate: 1 Hz (1000 ms frame period)
- *   • Motion sensitivity: 0 (default)
- *   • Detection sensitivity: 0 (default)
- *   • MPD profile: auto-select (0xAA)
- *   • Region: FCC / CE (default)
- *   • Boot calibration: disabled
- *
- * One detection zone
- * ──────────────────
- *   Zone 0:  X ±150 cm, Y 0–400 cm, Z 0–100 cm  (INCLUDE)
  */
 
 #include <zephyr/kernel.h>
@@ -68,7 +53,7 @@ SENSOR_DT_STREAM_IODEV(iwrl6322_iodev,
 		       SENSOR_STREAM_TRIGGER_PREP(SENSOR_TRIG_DATA_READY,
 						  SENSOR_STREAM_DATA_INCLUDE));
 
-#define IWRL6322_PAYLOAD_SIZE CONFIG_IWRL6322_MAX_PAYLOAD_BYTES 
+#define IWRL6322_PAYLOAD_SIZE CONFIG_IWRL6322_MAX_PAYLOAD_BYTES
 #define IWRL6322_BUFFER_SIZE (sizeof(struct iwrl6322_buffer_header) + IWRL6322_PAYLOAD_SIZE)
 #define RTIO_BLOCK_SIZE NHPOT(IWRL6322_BUFFER_SIZE)
 #if IWRL6322_PAYLOAD_SIZE >= 32768
@@ -185,8 +170,7 @@ int main(void)
 		LOG_INF("uDFP firmware: %u.%u.%u.%u",
 			(ver >> 24) & 0xFF, (ver >> 16) & 0xFF,
 			(ver >>  8) & 0xFF,  ver         & 0xFF);
-	}
-	else{
+	} else {
 		LOG_ERR("No uDFP Firmware Found");
 	}
 

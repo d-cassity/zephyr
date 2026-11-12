@@ -213,7 +213,15 @@ static T_ML_STATUS iwrl6322_device_pin_ctrl(UINT8 c_devIdx, UINT8 c_pinName, UIN
 		}
 		break;
 	case M_ML_DEVICE_PIN_TYPE_SOP_SELECT:
-		/* SOP select not wired; ignore */
+		/*
+		 * Called while nRESET is held low. Re-drive SOP0 low (SPI boot
+		 * mode) in case something else reconfigured the pin after init
+		 * (e.g. the CC23x0 SoC's external flash deep-power-down code uses
+		 * the same DIO as SOP0 on some modules).
+		 */
+		if (cfg->sop0_gpio.port != NULL) {
+			gpio_pin_configure_dt(&cfg->sop0_gpio, GPIO_OUTPUT_INACTIVE);
+		}
 		break;
 	default:
 		return M_RL_RET_CODE_INVALID_CONFIG;
@@ -374,7 +382,8 @@ static UINT32 iwrl6322_comm_write(T_ML_COMM_IF_HANDLE *p_hdl,
 
 /* ============================================================================
  * TI Library Initialisation
- * ========================================================================== */
+ * ============================================================================
+ */
 
 /*
  * Populate a T_ML_LINK_INIT_CFG with all required Zephyr callbacks.
@@ -430,7 +439,7 @@ static void iwrl6322_build_init_cfg(T_ML_LINK_INIT_CFG *cfg, uint16_t timeout_ms
 
 	/* Timeouts (ONLY RELEVNAT WHEN DEVICE BUSY DISABLED)*/
 	cfg->z_timeouts.h_rblSetupTimeUs   = 0;
-	cfg->z_timeouts.h_cmdHdrTimeUs 	   = 0;
+	cfg->z_timeouts.h_cmdHdrTimeUs    = 0;
 	cfg->z_timeouts.h_cmdLngMsgTimeUs  = 0;
 	cfg->z_timeouts.h_respLngMsgTimeUs = 0;
 }
@@ -548,6 +557,7 @@ static void iwrl6322_set_mode_bitfields(struct iwrl6322_data *data, int mode)
 static int iwrl6322_configure(const struct device *dev)
 {
 	T_ML_STATUS ret;
+
 	ARG_UNUSED(dev);
 
 	/*
@@ -600,7 +610,7 @@ static int iwrl6322_configure(const struct device *dev)
 		return -EIO;
 	}
 
-	if(g_priv->trig_boot_cal){
+	if (g_priv->trig_boot_cal) {
 		iwrl6322_wakeup(dev, 0);
 		k_msleep(100);
 		iwrl6322_wakeup(dev, 1);
@@ -676,9 +686,9 @@ static int iwrl6322_configure(const struct device *dev)
 		prof.h_NumOfFrames      = g_priv->mpd_num_frames;
 		prof.w_FramePeriodicity = g_priv->frame_period_ms;
 		prof.xc_AdvCfarCfg      = g_priv->mpd_adv_cfar_cfg;
-		prof.c_MinPoints 		= g_priv->mpd_min_points;
-		prof.xh_MaxDistance		= g_priv->mpd_max_distance_cluster;
-		prof.c_SteerVecEnCtrl	= g_priv->mpd_steer_vec_en_ctrl;
+		prof.c_MinPoints        = g_priv->mpd_min_points;
+		prof.xh_MaxDistance     = g_priv->mpd_max_distance_cluster;
+		prof.c_SteerVecEnCtrl   = g_priv->mpd_steer_vec_en_ctrl;
 
 		ret = ml_smartfeMpdProfCfg(0U, &prof);
 		if (ret != M_RL_RET_CODE_OK) {
@@ -756,6 +766,7 @@ static int iwrl6322_configure(const struct device *dev)
 static int iwrl6322_start_stop(const struct device *dev, uint8_t start)
 {
 	T_ML_SENS_START_STOP_CFG cfg = {0};
+
 	ARG_UNUSED(dev);
 
 	cfg.c_SensorStartStopCtrl = start ? M_ML_SENSOR_START : M_ML_SENSOR_STOP;
@@ -799,8 +810,10 @@ static int iwrl6322_fetch_data(const struct device *dev, void *buf, size_t buf_l
 		return -EINVAL;
 	}
 
-	/* Assert WAKE_UP before SPI transactions; device sleeps between frames.
-	 * Skipped when power saving is disabled — device is already active. */
+	/*
+	 * Assert WAKE_UP before SPI transactions; device sleeps between frames.
+	 * Skipped when power saving is disabled — device is already active.
+	 */
 	if (IS_ENABLED(CONFIG_IWRL6322_POWER_SAVING)) {
 		iwrl6322_wakeup(dev, 1);
 	}
@@ -808,6 +821,7 @@ static int iwrl6322_fetch_data(const struct device *dev, void *buf, size_t buf_l
 	/* Query device for the size of available data */
 	T_ML_SENS_DATASIZE_GET_CFG sz_cfg = {0};
 	T_ML_STATUS ret;
+
 	ret = ml_devSensorGetDataSize(0U, &sz_cfg);
 	if (ret != M_RL_RET_CODE_OK) {
 		LOG_ERR("IWRL6322: sensorGetDataSize failed: %d", ret);
@@ -1100,13 +1114,26 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 			return -EINVAL;
 		}
 		switch ((int)attr) {
-		case IWRL6322_ATTR_ZONE_XMIN: g_priv->zones[zi].xmin_cm = (int16_t)val->val2;  break;
-		case IWRL6322_ATTR_ZONE_XMAX: g_priv->zones[zi].xmax_cm = (int16_t)val->val2;  break;
-		case IWRL6322_ATTR_ZONE_YMIN: g_priv->zones[zi].ymin_cm = (uint16_t)val->val2; break;
-		case IWRL6322_ATTR_ZONE_YMAX: g_priv->zones[zi].ymax_cm = (uint16_t)val->val2; break;
-		case IWRL6322_ATTR_ZONE_ZMIN: g_priv->zones[zi].zmin_cm = (int16_t)val->val2; break;
-		case IWRL6322_ATTR_ZONE_ZMAX: g_priv->zones[zi].zmax_cm = (int16_t)val->val2; break;
-		default: break;
+		case IWRL6322_ATTR_ZONE_XMIN:
+			g_priv->zones[zi].xmin_cm = (int16_t)val->val2;
+			break;
+		case IWRL6322_ATTR_ZONE_XMAX:
+			g_priv->zones[zi].xmax_cm = (int16_t)val->val2;
+			break;
+		case IWRL6322_ATTR_ZONE_YMIN:
+			g_priv->zones[zi].ymin_cm = (uint16_t)val->val2;
+			break;
+		case IWRL6322_ATTR_ZONE_YMAX:
+			g_priv->zones[zi].ymax_cm = (uint16_t)val->val2;
+			break;
+		case IWRL6322_ATTR_ZONE_ZMIN:
+			g_priv->zones[zi].zmin_cm = (int16_t)val->val2;
+			break;
+		case IWRL6322_ATTR_ZONE_ZMAX:
+			g_priv->zones[zi].zmax_cm = (int16_t)val->val2;
+			break;
+		default:
+			break;
 		}
 		break;
 	}
@@ -1456,14 +1483,6 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 		g_priv->sens_in_plane_tilt = (int8_t)val->val1;
 		break;
 
-	// case IWRL6322_ATTR_GPADC_PARAM:
-	// 	g_priv->gpadc_param_val = (uint32_t)val->val1;
-	// 	return 0;
-
-	// case IWRL6322_ATTR_GPADC_CFG:
-	// 	g_priv->gpadc_cfg_val = (uint32_t)val->val1;
-	// 	return 0;
-
 	case IWRL6322_ATTR_STEER_VEC_CUSTOM_ENA:
 		g_priv->steer_vec_custom_ena = (val->val1 != 0);
 		break;
@@ -1574,13 +1593,26 @@ static int iwrl6322_attr_get(const struct device *dev, enum sensor_channel chan,
 			return -EINVAL;
 		}
 		switch ((int)attr) {
-		case IWRL6322_ATTR_ZONE_XMIN: val->val2 = (int32_t)g_priv->zones[zi].xmin_cm; break;
-		case IWRL6322_ATTR_ZONE_XMAX: val->val2 = (int32_t)g_priv->zones[zi].xmax_cm; break;
-		case IWRL6322_ATTR_ZONE_YMIN: val->val2 = (int32_t)g_priv->zones[zi].ymin_cm; break;
-		case IWRL6322_ATTR_ZONE_YMAX: val->val2 = (int32_t)g_priv->zones[zi].ymax_cm; break;
-		case IWRL6322_ATTR_ZONE_ZMIN: val->val2 = (int32_t)g_priv->zones[zi].zmin_cm; break;
-		case IWRL6322_ATTR_ZONE_ZMAX: val->val2 = (int32_t)g_priv->zones[zi].zmax_cm; break;
-		default: break;
+		case IWRL6322_ATTR_ZONE_XMIN:
+			val->val2 = (int32_t)g_priv->zones[zi].xmin_cm;
+			break;
+		case IWRL6322_ATTR_ZONE_XMAX:
+			val->val2 = (int32_t)g_priv->zones[zi].xmax_cm;
+			break;
+		case IWRL6322_ATTR_ZONE_YMIN:
+			val->val2 = (int32_t)g_priv->zones[zi].ymin_cm;
+			break;
+		case IWRL6322_ATTR_ZONE_YMAX:
+			val->val2 = (int32_t)g_priv->zones[zi].ymax_cm;
+			break;
+		case IWRL6322_ATTR_ZONE_ZMIN:
+			val->val2 = (int32_t)g_priv->zones[zi].zmin_cm;
+			break;
+		case IWRL6322_ATTR_ZONE_ZMAX:
+			val->val2 = (int32_t)g_priv->zones[zi].zmax_cm;
+			break;
+		default:
+			break;
 		}
 		return 0;
 	}
@@ -1849,16 +1881,6 @@ static int iwrl6322_attr_get(const struct device *dev, enum sensor_channel chan,
 		val->val1 = (int32_t)g_priv->api_timeout_ms;
 		val->val2 = 0;
 		return 0;
-
-	// case IWRL6322_ATTR_GPADC_PARAM:
-	// 	val->val1 = (int32_t)g_priv->gpadc_param_val;
-	// 	val->val2 = 0;
-	// 	return 0;
-
-	// case IWRL6322_ATTR_GPADC_CFG:
-	// 	val->val1 = (int32_t)g_priv->gpadc_cfg_val;
-	// 	val->val2 = 0;
-	// 	return 0;
 
 	case IWRL6322_ATTR_STEER_VEC_CUSTOM_ENA:
 		val->val1 = g_priv->steer_vec_custom_ena ? 1 : 0;
@@ -2211,7 +2233,7 @@ static int iwrl6322_struct_init(const struct device *dev)
 	g_priv->dev_antenna_sel   = CONFIG_IWRL6322_ANTENNA_TYPE;
 	g_priv->mpd_holdtime_10us = CONFIG_IWRL6322_MPD_HOLDTIME_10US;
 	g_priv->fe_calib_ctrl     = CONFIG_IWRL6322_FE_CALIB_CTRL; /* all calibrations enabled */
-	
+
 	/* MPD profile */
 	g_priv->mpd_meas_prof_sel       	= CONFIG_IWRL6322_ATTR_MPD_MEAS_PROF_SEL;
 	g_priv->mpd_detection_mode 			= CONFIG_IWRL6322_MPD_DETECTION_MODE;
@@ -2451,7 +2473,7 @@ static int iwrl6322_init(const struct device *dev)
 			return ret;
 		}
 	}
-	
+
 	k_work_init(&data->trig_work, iwrl6322_trig_work_handler);
 
 	static const struct k_work_queue_config wq_cfg = {
