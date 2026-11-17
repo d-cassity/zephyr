@@ -43,17 +43,28 @@ BUILD_ASSERT(sizeof(struct iwrl6322_point_data) == sizeof(T_ML_SENS_POINT_CLOUD_
 	     "iwrl6322_point_data / T_ML_SENS_POINT_CLOUD_DATA size mismatch");
 
 /*
- * MPD point cloud payload header — precedes the T_ML_SENS_POINT_CLOUD_DATA
- * array in device memory at 0x20000000 when operating in MPD mode.
+ * MPD point cloud payload header, as transferred by ml_devSensorGetData()
+ * (see the point cloud table in ml_dev.h, M_ML_POINTCLOUD_HDR_SIZE).
  *
- * Layout: [iwrl6322_pc_payload_hdr (8 bytes)] [T_ML_SENS_POINT_CLOUD_DATA × N]
+ * Layout: [iwrl6322_pc_payload_hdr (12 bytes)]
+ *         [T_ML_SENS_POINT_CLOUD_DATA x (major + minor points)]
+ *         [clusters, not decoded]
+ *
+ * The major and minor point entries are assembled back to back, so the
+ * number of points that follow the header is major + minor.
  */
 struct iwrl6322_pc_payload_hdr {
-	uint32_t w_FrameCount;    /* Rolling frame counter */
-	uint8_t  c_NumDetPoints;  /* Number of detected targets (0..64) */
-	uint8_t  c_ZoneOccupancy; /* Zone occupancy bitmap */
-	uint16_t h_Reserved;
+	uint32_t w_FrameCount;        /* Rolling frame counter */
+	uint16_t h_ZoneState;         /* Zone occupancy, bit i = zone i occupied */
+	uint8_t  c_NumPointsMajor;    /* Points in the major point cloud */
+	uint8_t  c_NumPointsMinor;    /* Points in the minor point cloud */
+	uint8_t  c_NumClustersMajor;  /* Clusters in the major point cloud */
+	uint8_t  c_NumClustersMinor;  /* Clusters in the minor point cloud */
+	uint8_t  c_Reserved[2];
 };
+
+BUILD_ASSERT(sizeof(struct iwrl6322_pc_payload_hdr) == 12U,
+	     "iwrl6322_pc_payload_hdr must match M_ML_POINTCLOUD_HDR_SIZE");
 
 /* Maximum number of MPD detection points returned by IWRL6322 firmware */
 #define IWRL6322_MAX_DET_POINTS 64U
@@ -98,6 +109,21 @@ static const uint8_t *validate_and_skip_header(const uint8_t *buffer,
 	return buffer + sizeof(struct iwrl6322_buffer_header);
 }
 
+/*
+ * Number of point entries that can be read from the payload: major + minor
+ * from the device header, limited to what the payload actually holds and to
+ * IWRL6322_MAX_DET_POINTS. The caller has checked payload_size >= header size.
+ */
+static uint8_t pc_num_points(const struct iwrl6322_pc_payload_hdr *pc_hdr,
+			     uint16_t payload_size)
+{
+	uint32_t reported = (uint32_t)pc_hdr->c_NumPointsMajor + pc_hdr->c_NumPointsMinor;
+	uint32_t room = (payload_size - sizeof(struct iwrl6322_pc_payload_hdr)) /
+			sizeof(T_ML_SENS_POINT_CLOUD_DATA);
+
+	return (uint8_t)MIN(MIN(reported, room), (uint32_t)IWRL6322_MAX_DET_POINTS);
+}
+
 /* Returns true if the operating_mode in the header is an MPD mode */
 static inline bool is_mpd_mode(uint8_t operating_mode)
 {
@@ -139,7 +165,7 @@ static int iwrl6322_decoder_get_frame_count(const uint8_t *buffer,
 	const struct iwrl6322_pc_payload_hdr *pc_hdr =
 		(const struct iwrl6322_pc_payload_hdr *)payload;
 
-	*frame_count = (uint16_t)MIN(pc_hdr->c_NumDetPoints, (uint8_t)IWRL6322_MAX_DET_POINTS);
+	*frame_count = pc_num_points(pc_hdr, hdr->payload_size);
 	return 0;
 }
 
@@ -196,7 +222,7 @@ static int iwrl6322_decoder_decode(const uint8_t *buffer,
 		(const struct iwrl6322_pc_payload_hdr *)payload;
 	struct iwrl6322_point_cloud_data *out = data_out;
 
-	uint8_t total = (uint8_t)MIN(pc_hdr->c_NumDetPoints, (uint8_t)IWRL6322_MAX_DET_POINTS);
+	uint8_t total = pc_num_points(pc_hdr, hdr->payload_size);
 	uint8_t start = (uint8_t)*fit;
 
 	if (start >= total) {
@@ -208,7 +234,7 @@ static int iwrl6322_decoder_decode(const uint8_t *buffer,
 	out->header.base_timestamp_ns = (uint64_t)hdr->timestamp_us * 1000ULL;
 	out->header.reading_count     = count;
 	out->frame_count              = pc_hdr->w_FrameCount;
-	out->zone_occupancy           = pc_hdr->c_ZoneOccupancy;
+	out->zone_occupancy           = pc_hdr->h_ZoneState;
 
 	/* Zero-copy: point directly into the RTIO buffer payload after the header */
 	const T_ML_SENS_POINT_CLOUD_DATA *pts =
@@ -260,13 +286,16 @@ int iwrl6322_decoder_get_sensor_info(const uint8_t *buf, size_t buf_len,
 		return -ENOTSUP;
 	}
 
+	if (hdr->payload_size < sizeof(struct iwrl6322_pc_payload_hdr)) {
+		return -EINVAL;
+	}
+
 	const struct iwrl6322_pc_payload_hdr *pc_hdr =
 		(const struct iwrl6322_pc_payload_hdr *)payload;
 
 	out->frame_count    = pc_hdr->w_FrameCount;
-	out->num_detections = (uint8_t)MIN(pc_hdr->c_NumDetPoints,
-					   (uint8_t)IWRL6322_MAX_DET_POINTS);
-	out->zone_occupancy = pc_hdr->c_ZoneOccupancy;
+	out->num_detections = pc_num_points(pc_hdr, hdr->payload_size);
+	out->zone_occupancy = pc_hdr->h_ZoneState;
 
 	/* Zero-copy: point directly into the RTIO buffer payload */
 	const T_ML_SENS_POINT_CLOUD_DATA *pts =

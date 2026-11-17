@@ -42,9 +42,12 @@
  */
 struct pc_payload_hdr {
 	uint32_t w_FrameCount;
-	uint8_t  c_NumDetPoints;
-	uint8_t  c_ZoneOccupancy;
-	uint16_t h_Reserved;
+	uint16_t h_ZoneState;
+	uint8_t  c_NumPointsMajor;
+	uint8_t  c_NumPointsMinor;
+	uint8_t  c_NumClustersMajor;
+	uint8_t  c_NumClustersMinor;
+	uint8_t  c_Reserved[2];
 };
 
 /* -------------------------------------------------------------------------
@@ -81,14 +84,15 @@ static void fill_header(uint8_t *buf,
  * @param buf           Destination buffer (must be large enough)
  * @param operating_mode IWRL6322_MODE_MPD_PRESENCE or IWRL6322_MODE_MPD_VERBOSE
  * @param frame_count   Rolling frame counter placed in the pc_payload_hdr
- * @param zone_occ      Zone occupancy bitmap
+ * @param zone_occ      Zone occupancy bitmap (16 bits)
  * @param num_pts       Number of T_ML_SENS_POINT_CLOUD_DATA entries to append
+ *                      (reported as major points; minor points are 0)
  * @return Total number of bytes written
  */
 static size_t build_mpd_buf(uint8_t *buf,
 			    uint8_t operating_mode,
 			    uint32_t frame_count,
-			    uint8_t zone_occ,
+			    uint16_t zone_occ,
 			    uint8_t num_pts)
 {
 	size_t payload_size = sizeof(struct pc_payload_hdr) +
@@ -99,10 +103,10 @@ static size_t build_mpd_buf(uint8_t *buf,
 	struct pc_payload_hdr *pc =
 		(struct pc_payload_hdr *)(buf + sizeof(struct iwrl6322_buffer_header));
 
-	pc->w_FrameCount    = frame_count;
-	pc->c_NumDetPoints  = num_pts;
-	pc->c_ZoneOccupancy = zone_occ;
-	pc->h_Reserved      = 0;
+	memset(pc, 0, sizeof(*pc));
+	pc->w_FrameCount     = frame_count;
+	pc->h_ZoneState      = zone_occ;
+	pc->c_NumPointsMajor = num_pts;
 
 	/* Fill each point with recognisable synthetic values */
 	struct iwrl6322_point_data *pts =
@@ -212,8 +216,9 @@ ZTEST(iwrl6322_decoder, test_get_frame_count_zero_detections)
 ZTEST(iwrl6322_decoder, test_get_frame_count_clamps_at_64)
 {
 	/*
-	 * The decoder must clamp c_NumDetPoints to IWRL6322_MAX_DET_POINTS (64)
-	 * even if the firmware returns a larger value.
+	 * The decoder must clamp the reported point count to
+	 * IWRL6322_MAX_DET_POINTS (64) even if the firmware returns a larger
+	 * value.
 	 */
 	uint8_t buf[1024];
 	const struct sensor_decoder_api *dec;
@@ -223,17 +228,64 @@ ZTEST(iwrl6322_decoder, test_get_frame_count_clamps_at_64)
 	};
 	uint16_t count = 0;
 
-	/* Build with 64 real points; then hand-patch c_NumDetPoints to 100 */
+	/* Build with 64 real points; then hand-patch c_NumPointsMajor to 100 */
 	build_mpd_buf(buf, IWRL6322_MODE_MPD_VERBOSE, 1, 0, 64);
 
 	struct pc_payload_hdr *pc =
 		(struct pc_payload_hdr *)(buf + sizeof(struct iwrl6322_buffer_header));
 
-	pc->c_NumDetPoints = 100; /* exceeds max */
+	pc->c_NumPointsMajor = 100; /* exceeds max */
 
 	zassert_ok(iwrl6322_get_decoder(NULL, &dec));
 	zassert_ok(dec->get_frame_count(buf, cs, &count));
 	zassert_true(count <= 64, "frame_count %u exceeds max 64", count);
+}
+
+ZTEST(iwrl6322_decoder, test_get_frame_count_major_plus_minor)
+{
+	/* Points that follow the header are the major plus the minor points */
+	uint8_t buf[512];
+	const struct sensor_decoder_api *dec;
+	struct sensor_chan_spec cs = {
+		.chan_type = (uint16_t)IWRL6322_CHAN_SENSOR_INFO,
+		.chan_idx  = 0,
+	};
+	uint16_t count = 0xFFFF;
+
+	build_mpd_buf(buf, IWRL6322_MODE_MPD_VERBOSE, 1, 0, 5);
+
+	struct pc_payload_hdr *pc =
+		(struct pc_payload_hdr *)(buf + sizeof(struct iwrl6322_buffer_header));
+
+	pc->c_NumPointsMajor = 3;
+	pc->c_NumPointsMinor = 2;
+
+	zassert_ok(iwrl6322_get_decoder(NULL, &dec));
+	zassert_ok(dec->get_frame_count(buf, cs, &count));
+	zassert_equal(count, 5);
+}
+
+ZTEST(iwrl6322_decoder, test_get_frame_count_limited_by_payload)
+{
+	/* A count larger than the points actually present must not overrun */
+	uint8_t buf[512];
+	const struct sensor_decoder_api *dec;
+	struct sensor_chan_spec cs = {
+		.chan_type = (uint16_t)IWRL6322_CHAN_SENSOR_INFO,
+		.chan_idx  = 0,
+	};
+	uint16_t count = 0xFFFF;
+
+	build_mpd_buf(buf, IWRL6322_MODE_MPD_VERBOSE, 1, 0, 2);
+
+	struct pc_payload_hdr *pc =
+		(struct pc_payload_hdr *)(buf + sizeof(struct iwrl6322_buffer_header));
+
+	pc->c_NumPointsMajor = 10; /* only 2 points are in the payload */
+
+	zassert_ok(iwrl6322_get_decoder(NULL, &dec));
+	zassert_ok(dec->get_frame_count(buf, cs, &count));
+	zassert_equal(count, 2);
 }
 
 ZTEST(iwrl6322_decoder, test_get_frame_count_fe_mode_returns_zero)
@@ -493,6 +545,31 @@ ZTEST(iwrl6322_decoder, test_get_sensor_info_mpd)
 	/* Spot-check the zero-copy point pointer */
 	zassert_equal(info.points[0].x_cm, 10);
 	zassert_equal(info.points[3].x_cm, 40);
+}
+
+ZTEST(iwrl6322_decoder, test_get_sensor_info_zone_occupancy_16_bits)
+{
+	uint8_t buf[512];
+	struct iwrl6322_sensor_info info;
+
+	size_t total = build_mpd_buf(buf, IWRL6322_MODE_MPD_VERBOSE, 5, 0x8001, 1);
+
+	zassert_ok(iwrl6322_decoder_get_sensor_info(buf, total, &info));
+	zassert_equal(info.zone_occupancy, 0x8001,
+		      "zone 0 and zone 15 must both be reported");
+	zassert_equal(info.num_detections, 1);
+	zassert_equal(info.points[0].x_cm, 10);
+}
+
+ZTEST(iwrl6322_decoder, test_get_sensor_info_payload_shorter_than_header)
+{
+	uint8_t buf[128] = {0};
+	struct iwrl6322_sensor_info info;
+
+	fill_header(buf, IWRL6322_MODE_MPD_VERBOSE, 8, 0);
+
+	zassert_equal(iwrl6322_decoder_get_sensor_info(buf, sizeof(buf), &info),
+		      -EINVAL);
 }
 
 ZTEST(iwrl6322_decoder, test_get_sensor_info_fe_raw_adc)
