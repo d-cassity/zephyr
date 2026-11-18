@@ -23,7 +23,7 @@ extern "C" {
  *
  * channel_get() for IWRL6322_CHAN_SENSOR_INFO returns:
  *   val1 — number of detected targets in the last frame (0–64)
- *   val2 — zone-occupancy bitmap (bit i = zone i occupied)
+ *   val2 — zone-occupancy bitmap, 16 bits (bit i = zone i occupied)
  *
  * Full point cloud is accessible via sensor_get_decoder() / sensor_read().
  * Data is only accessible via the RTIO streaming API for this device.
@@ -106,13 +106,13 @@ enum iwrl6322_sensor_attr {
 	IWRL6322_ATTR_ZONE_XMIN,
 	/** Zone X upper bound (cm, signed); val1=zone_idx, val2=xmax */
 	IWRL6322_ATTR_ZONE_XMAX,
-	/** Zone Y lower bound (cm, 0..1500); val1=zone_idx, val2=ymin */
+	/** Zone Y lower bound (cm, -1500..1500; theta in deg for polar); val1=zone_idx, val2=ymin */
 	IWRL6322_ATTR_ZONE_YMIN,
-	/** Zone Y upper bound (cm, 0..1500); val1=zone_idx, val2=ymax */
+	/** Zone Y upper bound (cm, -1500..1500; theta in deg for polar); val1=zone_idx, val2=ymax */
 	IWRL6322_ATTR_ZONE_YMAX,
-	/** Zone Z lower bound (cm, 0..1500); val1=zone_idx, val2=zmin */
+	/** Zone Z lower bound (cm, -1500..1500); val1=zone_idx, val2=zmin */
 	IWRL6322_ATTR_ZONE_ZMIN,
-	/** Zone Z upper bound (cm, 0..1500); val1=zone_idx, val2=zmax */
+	/** Zone Z upper bound (cm, -1500..1500); val1=zone_idx, val2=zmax */
 	IWRL6322_ATTR_ZONE_ZMAX,
 
 	/** Zone inclusion/exclusion; val1=zone_idx, val2=1(INCLUDE)/0(EXCLUDE) */
@@ -273,7 +273,7 @@ enum iwrl6322_sensor_attr {
 	/** Sensor elevation tilt about X axis (degrees). val1=-90..90 */
 	IWRL6322_ATTR_SENS_TILT_ELEVATION,
 
-	/** Sensor in-plane tilt about Y axis (degrees): -90, 0, or +90 only */
+	/** Sensor in-plane tilt about Y axis (degrees): -90, 0, +90 or +180 only */
 	IWRL6322_ATTR_SENS_IN_PLANE_TILT,
 
 	/** GPADC parameter word (w_ParamVal: bits[9:2]=channel ctrl, bits[28:26]=signal type) */
@@ -309,8 +309,8 @@ enum iwrl6322_sensor_attr {
 struct iwrl6322_zone_cfg {
 	int16_t  xmin_cm;
 	int16_t  xmax_cm;
-	uint16_t ymin_cm;
-	uint16_t ymax_cm;
+	int16_t  ymin_cm;
+	int16_t  ymax_cm;
 	int16_t  zmin_cm;
 	int16_t  zmax_cm;
 	bool     include;
@@ -359,7 +359,7 @@ struct iwrl6322_point_data {
 struct iwrl6322_point_cloud_data {
 	struct sensor_data_header           header;
 	uint32_t                            frame_count;
-	uint8_t                             zone_occupancy;
+	uint16_t                            zone_occupancy;
 	const struct iwrl6322_point_data   *readings;
 };
 
@@ -371,7 +371,7 @@ struct iwrl6322_point_cloud_data {
 struct iwrl6322_sensor_info {
 	uint32_t frame_count;
 	uint8_t  num_detections;
-	uint8_t  zone_occupancy;
+	uint16_t zone_occupancy;   /**< Bit i = zone i occupied (zones 0..15) */
 	const struct iwrl6322_point_data *points;    /**< MPD modes; NULL in FE modes */
 	const uint16_t *raw_data;                    /**< FE modes; NULL in MPD modes */
 	uint32_t        raw_data_len;
@@ -537,7 +537,7 @@ struct iwrl6322_data {
 	int16_t  sens_pos_z_cm;          /* xh_SensPosZ: ±1500 cm */
 	int8_t   sens_tilt_azimuth;      /* xc_SensTiltAzimuth: ±90 deg */
 	int8_t   sens_tilt_elevation;    /* xc_SensTiltElevation: ±90 deg */
-	int8_t   sens_in_plane_tilt;     /* xc_InPlaneTilt: 0, ±90 deg */
+	int16_t  sens_in_plane_tilt;     /* xc_InPlaneTilt: 0, ±90, +180 deg */
 
 	/* Reset and power-up timing (init-time only)                           */
 	uint8_t  nreset_setup_time_10us; /* c_NResetSetupTime10us: 0=default 20 µs */

@@ -698,6 +698,35 @@ static int iwrl6322_configure(const struct device *dev)
 
 		/* MPD zone config */
 		T_ML_SENS_MPD_ZONE_CFG zone_cfg = {0};
+		bool have_include = false;
+
+		/* Validate the zones that will be sent (see ml_smartfeMpdZoneCfg) */
+		for (uint8_t zi = 0; zi < g_priv->num_zones; zi++) {
+			const struct iwrl6322_zone_cfg *z = &g_priv->zones[zi];
+
+			if (z->xmin_cm > z->xmax_cm || z->ymin_cm > z->ymax_cm ||
+			    z->zmin_cm > z->zmax_cm) {
+				LOG_ERR("IWRL6322: zone %u has min > max", zi);
+				return -EINVAL;
+			}
+			if (!g_priv->coordinate_cartesian &&
+			    (z->xmin_cm < 0 || z->ymin_cm < -90 || z->ymax_cm > 90)) {
+				LOG_ERR("IWRL6322: zone %u out of range for polar coordinates", zi);
+				return -EINVAL;
+			}
+			if (z->include) {
+				have_include = true;
+			}
+		}
+		if (!have_include) {
+			LOG_ERR("IWRL6322: at least one include zone is required");
+			return -EINVAL;
+		}
+		if (!g_priv->coordinate_cartesian &&
+		    (g_priv->sens_pos_x_cm != 0 || g_priv->sens_pos_y_cm != 0)) {
+			LOG_ERR("IWRL6322: sensor X/Y position must be 0 for polar coordinates");
+			return -EINVAL;
+		}
 
 		zone_cfg.c_ZoneCoordSelCtrl  = g_priv->coordinate_cartesian
 					       ? M_ML_MPD_ZONE_TYPE_CORD_CARTESIAN
@@ -1113,6 +1142,9 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 		if (zi < 0 || zi >= 16) {
 			return -EINVAL;
 		}
+		if (val->val2 < -1500 || val->val2 > 1500) {
+			return -EINVAL;
+		}
 		switch ((int)attr) {
 		case IWRL6322_ATTR_ZONE_XMIN:
 			g_priv->zones[zi].xmin_cm = (int16_t)val->val2;
@@ -1121,10 +1153,10 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 			g_priv->zones[zi].xmax_cm = (int16_t)val->val2;
 			break;
 		case IWRL6322_ATTR_ZONE_YMIN:
-			g_priv->zones[zi].ymin_cm = (uint16_t)val->val2;
+			g_priv->zones[zi].ymin_cm = (int16_t)val->val2;
 			break;
 		case IWRL6322_ATTR_ZONE_YMAX:
-			g_priv->zones[zi].ymax_cm = (uint16_t)val->val2;
+			g_priv->zones[zi].ymax_cm = (int16_t)val->val2;
 			break;
 		case IWRL6322_ATTR_ZONE_ZMIN:
 			g_priv->zones[zi].zmin_cm = (int16_t)val->val2;
@@ -1477,10 +1509,11 @@ static int iwrl6322_attr_set_helper(const struct device *dev, enum sensor_channe
 		break;
 
 	case IWRL6322_ATTR_SENS_IN_PLANE_TILT:
-		if (val->val1 != 0 && val->val1 != 90 && val->val1 != -90) {
+		if (val->val1 != 0 && val->val1 != 90 && val->val1 != -90 &&
+		    val->val1 != 180) {
 			return -EINVAL;
 		}
-		g_priv->sens_in_plane_tilt = (int8_t)val->val1;
+		g_priv->sens_in_plane_tilt = (int16_t)val->val1;
 		break;
 
 	case IWRL6322_ATTR_STEER_VEC_CUSTOM_ENA:
