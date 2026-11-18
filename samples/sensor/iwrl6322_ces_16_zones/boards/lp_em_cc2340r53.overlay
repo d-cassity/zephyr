@@ -1,0 +1,55 @@
+/*
+ * Copyright (c) 2026 Texas Instruments Incorporated
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * LP-EM-CC2340R53 board overlay for the IWRL6322 sensor sample.
+ *
+ * Pin wiring (DIO number -> IWRL6322 signal):
+ *
+ *  DIO18  SPI_CLK          CLK    (board pinctrl: spi0_sck_default)
+ *  DIO13  SPI_MOSI         MOSI   (board pinctrl: spi0_mosi_default)
+ *  DIO12  SPI_MISO         MISO   (board pinctrl: spi0_miso_default)
+ *  DIO15  SPI_CS           CSN    driven as a GPIO via cs-gpios
+ *  DIO19  nRESET           nRESET
+ *  DIO9   SPI_BUSY         MCU_DEVICE_BUSY
+ *  DIO14  WAKE_UP          WAKE_UP (SOP1 on the breakout)
+ *  DIO8   PRESENCE_DETECT  PRESENCE_DETECT / HOST_IRQ
+ *  DIO21  SOP0             SOP0 (pull-down -> SPI boot mode)
+ *  DIO5   SOP1             SOP1 (pull-down -> SPI boot mode)
+ *
+ * The board's pinctrl-0 for spi0 includes a 4th CS pin (DIO6), which makes
+ * the SPI driver use hardware CS instead of the GPIO CS on DIO15.  pinctrl-0
+ * is therefore overridden with a 3-pin state (SCK, MOSI, MISO only) so the
+ * driver falls back to cs-gpios.  The board defines a "sleep" pinctrl state
+ * as well, so pinctrl-1 and pinctrl-names are overridden to match.
+ *
+ * Power: the IWRL6322 draws noticeably more current once MPD processing is
+ * running.  If the board powers the radar through a jump-start USB cable,
+ * leave that cable connected, otherwise the supply can sag.
+ */
+
+#include <zephyr/dt-bindings/pinctrl/cc23x0-pinctrl.h>
+
+/* Remove the on-board flash so IWRL6322 can take CS index 0. */
+/delete-node/ &mx25r80;
+
+&spi0 {
+	/* 3-pin pinctrl — no HW CS pin, driver uses cs-gpios */
+	pinctrl-0 = <&spi0_sck_default &spi0_mosi_default &spi0_miso_default>;
+	pinctrl-1 = <&spi0_sck_sleep &spi0_mosi_sleep &spi0_miso_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+
+	iwrl6322: iwrl6322@0 {
+		compatible = "ti,iwrl6322";
+		reg = <0>;
+		spi-max-frequency = <1000000>; /* 1 MHz */
+
+		nreset-gpios          = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+		spi-busy-gpios        = <&gpio0 9  GPIO_ACTIVE_HIGH>;
+		wake-up-gpios         = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		presence-detect-gpios = <&gpio0 8  GPIO_ACTIVE_HIGH>;
+		sop0-gpios            = <&gpio0 21 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+		sop1-gpios            = <&gpio0 5  (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+	};
+};
